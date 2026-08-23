@@ -1,8 +1,9 @@
-import "server-only";
+// No `server-only`: the course importer alongside this one is already callable
+// from scripts, and validating a roster file offline needs the same.
 import { z } from "zod";
 import { prisma } from "../db";
-import { hashPassword } from "../auth";
-import { parseUploadedTable, type ParsedRow } from "../spreadsheet";
+import { hashPassword } from "../password";
+import type { ParsedRow } from "./parse";
 import { LOCALES } from "../constants";
 
 export const EMPLOYEE_IMPORT_COLUMNS = [
@@ -62,6 +63,9 @@ const pick = (row: ParsedRow, ...names: string[]) => {
 
 /** Validates the whole file first so an administrator can fix errors before committing. */
 export async function previewEmployeeImport(file: File): Promise<ImportPreview> {
+  // Loaded here rather than at module scope: the spreadsheet reader pulls in
+  // ExcelJS and `server-only`, and validating rows needs neither.
+  const { parseUploadedTable } = await import("../spreadsheet");
   const { headers, rows } = await parseUploadedTable(file);
   return validateEmployeeRows(headers, rows);
 }

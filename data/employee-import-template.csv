@@ -1,0 +1,6 @@
+Employee ID,Full Name,Email,Department,Section,Job Title,Manager Employee ID,Location,Language,Years Experience,AI Experience,Technical,Weekly Hours
+TC-1001,Hala Mansour,hala.mansour@tcgarments.com,Production,,Production Manager,,Factory 1,ar,12,BEGINNER,no,3
+TC-1002,Omar Zaki,omar.zaki@tcgarments.com,Production,,Line Leader,TC-1001,Factory 1,ar,5,NONE,no,2
+TC-1003,Yasmin Farouk,yasmin.farouk@tcgarments.com,Human Resources,,HR Manager,,Head Office,en,9,INTERMEDIATE,no,4
+TC-1004,Mehmet Yilmaz,mehmet.yilmaz@tcgarments.com,Quality,,Quality Engineer,,Istanbul Office,tr,6,BEGINNER,no,3
+TC-1005,Ahmed Saleh,ahmed.saleh@tcgarments.com,Information Technology,,IT Support Specialist,,Head Office,en,4,ADVANCED,yes,5

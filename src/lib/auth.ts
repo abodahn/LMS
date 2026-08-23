@@ -3,13 +3,11 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import bcrypt from "bcryptjs";
 import { prisma } from "./db";
 import { permissionsForRoles, primaryRole, type PermissionKey } from "./rbac";
 import type { Locale } from "./constants";
 
 export const SESSION_COOKIE = "tcai_session";
-const BCRYPT_ROUNDS = 12;
 
 export type SessionUser = {
   id: string;
@@ -31,13 +29,7 @@ export type SessionUser = {
   onboardingStep: string;
 };
 
-export function hashPassword(plain: string) {
-  return bcrypt.hash(plain, BCRYPT_ROUNDS);
-}
-
-export function verifyPassword(plain: string, hash: string) {
-  return bcrypt.compare(plain, hash);
-}
+export { hashPassword, verifyPassword } from "./password";
 
 const sha256 = (v: string) => createHash("sha256").update(v).digest("hex");
 
