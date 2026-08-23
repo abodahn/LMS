@@ -30,10 +30,19 @@ async function main() {
 
   if (roles > 0) {
     const users = await prisma.user.count();
-    console.log(`[bootstrap] database already set up (${roles} roles, ${users} users) — nothing to do`);
-    return;
+    console.log(`[bootstrap] reference data already present (${roles} roles, ${users} users)`);
+  } else {
+    await seedReferenceData();
   }
 
+  // Always, not only on a fresh database: an instance deployed without these
+  // variables has no administrator, and the operator's fix is to add them and
+  // redeploy. That has to work.
+  await ensureAdministrator();
+  console.log("[bootstrap] done");
+}
+
+async function seedReferenceData() {
   console.log("[bootstrap] empty database — seeding reference data");
 
   // Imported lazily so a normal boot never pays to parse the seed modules.
@@ -65,13 +74,26 @@ async function main() {
   await step("learning paths", () => seedPaths(prisma));
   await step("prompt library and use cases", () => seedContent(prisma));
 
-  // An instance nobody can sign into is not deployed, it is just running. If
-  // the operator supplied credentials, make the first administrator here;
-  // otherwise say plainly how to create one.
+}
+
+/**
+ * Creates the first administrator, if one is asked for and does not exist.
+ *
+ * An instance nobody can sign into is not deployed, it is just running. This
+ * runs on every boot and is a no-op once the account is there, so recovering
+ * from a deploy that forgot the variables is: add them, redeploy.
+ */
+async function ensureAdministrator() {
   const code = process.env.ADMIN_CODE;
   const password = process.env.ADMIN_PASSWORD;
 
   if (code && password) {
+    const already = await prisma.user.findUnique({ where: { employeeCode: code } });
+    if (already) {
+      console.log(`[bootstrap] administrator ${code} already exists — leaving it alone`);
+      return;
+    }
+
     const bcrypt = (await import("bcryptjs")).default;
     const role = await prisma.role.findUniqueOrThrow({ where: { key: "SUPER_ADMIN" } });
     const user = await prisma.user.create({
@@ -99,12 +121,17 @@ async function main() {
       },
     });
     console.log(`[bootstrap] administrator ${code} created — it must change its password at first sign-in`);
-  } else {
-    console.log("[bootstrap] no ADMIN_CODE / ADMIN_PASSWORD set — create one with:");
-    console.log("[bootstrap]   npx tsx scripts/create-admin.mts --code <id> --password <password>");
+    return;
   }
 
-  console.log("[bootstrap] done");
+  // Say so loudly. Silence here looks identical to a working deploy right up
+  // until somebody tries to sign in.
+  const admins = await prisma.userRole.count({ where: { role: { key: "SUPER_ADMIN" } } });
+  if (admins === 0) {
+    console.warn("[bootstrap] ⚠ no administrator exists and ADMIN_CODE / ADMIN_PASSWORD are not set.");
+    console.warn("[bootstrap]   Nobody can sign in. Either set both variables and redeploy, or run:");
+    console.warn("[bootstrap]   npx tsx scripts/create-admin.mts --code <id> --password <password>");
+  }
 }
 
 main()
