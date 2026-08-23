@@ -8,6 +8,18 @@ read on organisational AI readiness.
 It is a working system, not a prototype: a real database, real authentication,
 real grading, real exports.
 
+## Deploy
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/abodahn/LMS)
+
+Render reads [`render.yaml`](render.yaml) and provisions the service with its
+persistent disk already configured. Set `ADMIN_CODE`, `ADMIN_PASSWORD` and
+`ADMIN_NAME` before the first deploy and the first administrator is created on
+boot — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#4-render-managed-recommended).
+
+The Starter plan or above is required: the free tier has no persistent disk, and
+without one the database is discarded on every deploy.
+
 ---
 
 ## The employee journey
