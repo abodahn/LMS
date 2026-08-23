@@ -54,6 +54,16 @@ export function LoginForm() {
           {t("auth.forgotPassword")}
         </Link>
       </p>
+
+      <p className="text-center text-[13px] text-[var(--brand-muted)]">
+        {t("auth.noAccountYet")}{" "}
+        <Link
+          href="/register"
+          className="font-medium text-[var(--brand-red)] underline-offset-4 hover:underline"
+        >
+          {t("auth.registerLink")}
+        </Link>
+      </p>
     </form>
   );
 }
