@@ -73,7 +73,53 @@ async function seedReferenceData() {
   await step("assessments and question banks", () => seedAssessments(prisma));
   await step("learning paths", () => seedPaths(prisma));
   await step("prompt library and use cases", () => seedContent(prisma));
+  await importCatalogue();
 
+}
+
+/**
+ * Loads the harvested catalogue from the committed CSV.
+ *
+ * The seeds build 55 curated courses. The other 1,100 were produced by
+ * harvesting YouTube and verifying platform links — slow, networked work that
+ * has no business running on a production boot, so the reviewed result travels
+ * with the repository instead (see scripts/export-catalog.mts).
+ *
+ * Importing also gives every YouTube course a playable lesson, so the
+ * catalogue arrives usable rather than as a list of links.
+ *
+ * A missing or unreadable file is a warning, not a failure: 55 courses is a
+ * working academy, and refusing to start over the other 1,100 would be the
+ * wrong trade.
+ */
+async function importCatalogue() {
+  const path = "data/catalog.csv";
+  const started = Date.now();
+
+  try {
+    const { readFileSync, existsSync } = await import("node:fs");
+    if (!existsSync(path)) {
+      console.warn(`[bootstrap]   no ${path} — keeping the ${await prisma.course.count()} seeded courses`);
+      return;
+    }
+
+    const { parseCsv } = await import("../src/lib/import/parse");
+    const { validateCourseRows, commitCourseImport } = await import("../src/lib/import/courses");
+
+    const { headers, rows } = parseCsv(readFileSync(path, "utf8"));
+    const preview = await validateCourseRows(headers, rows);
+
+    // trustLinks: every URL in this file was verified when it was harvested,
+    // which is a stronger check than an administrator ticking a box.
+    const result = await commitCourseImport(preview, { trustLinks: true });
+    console.log(
+      `[bootstrap]   catalogue: ${result.created} courses, ${result.lessons} playable lessons (${Date.now() - started}ms)`,
+    );
+  } catch (error) {
+    console.warn(
+      `[bootstrap]   catalogue import failed, continuing with the seeded courses: ${error instanceof Error ? error.message : error}`,
+    );
+  }
 }
 
 /**

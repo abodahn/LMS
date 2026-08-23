@@ -21,6 +21,7 @@ import { SETTING_KEYS } from "@/lib/constants";
 import { LOCALE_COOKIE } from "@/lib/locale";
 import { isLocale } from "@/lib/i18n";
 import { sendMail } from "@/lib/mailer";
+import { rateLimit } from "@/lib/rate-limit";
 
 export type ActionState = { error?: string; success?: string };
 
@@ -190,4 +191,108 @@ export async function setLocaleAction(locale: string) {
   if (current) {
     await prisma.user.update({ where: { id: current.id }, data: { preferredLanguage: locale } });
   }
+}
+
+/**
+ * Registration, for an employee HR has already added.
+ *
+ * This is activation rather than sign-up. The service is reachable from the
+ * public internet, so an open form would let anyone create an account inside
+ * the company's HR records; instead a person can only claim an account that
+ * already exists on the roster and has never been used. Everyone else is
+ * refused, and HR keeps control of who is in the system by controlling the
+ * import.
+ *
+ * The answer is deliberately the same whether the employee id is unknown, the
+ * email does not match, or the account has already been claimed. Three
+ * different messages would turn this form into a way to test whether a given
+ * person works here.
+ *
+ * What this does NOT prove is that the person filling it in is who they say:
+ * an employee id and a work email are both things a colleague knows. That is
+ * acceptable for an internal roll-out and is not acceptable for a public URL
+ * indefinitely — the fix is to send a one-time link to the address on file,
+ * which needs SMTP configured (Admin → Integrations). Until then every attempt,
+ * successful or not, is written to the audit log.
+ */
+const registerSchema = z.object({
+  employeeCode: z.string().trim().min(2).max(40),
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string(),
+  confirm: z.string(),
+});
+
+export async function registerAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = registerSchema.safeParse({
+    employeeCode: formData.get("employeeCode"),
+    email: formData.get("email"),
+    password: formData.get("password"),
+    confirm: formData.get("confirm"),
+  });
+  if (!parsed.success) return { error: "auth.registerRefused" };
+
+  const { employeeCode, email, password, confirm } = parsed.data;
+
+  // Slow down anyone walking the employee-id space.
+  if (!rateLimit(`register:${employeeCode.toLowerCase()}`, 5, 15 * 60_000)) {
+    return { error: "auth.tooManyAttempts" };
+  }
+
+  if (password !== confirm) return { error: "auth.passwordsDoNotMatch" };
+  if (!passwordRule.safeParse(password).success) return { error: "auth.passwordTooWeak" };
+
+  const user = await prisma.user.findFirst({
+    where: { employeeCode, deletedAt: null },
+  });
+
+  // An account can be claimed once: never signed in, and still carrying the
+  // placeholder credentials the import gave it.
+  const claimable =
+    !!user &&
+    user.lastLoginAt === null &&
+    (user.mustChangePassword || user.status === "INVITED") &&
+    user.email.toLowerCase() === email;
+
+  if (!claimable) {
+    await audit({
+      actorName: employeeCode,
+      action: "ACCOUNT_ACTIVATION_REFUSED",
+      entity: "User",
+      entityId: user?.id ?? null,
+      summary: !user
+        ? "No such employee id"
+        : user.email.toLowerCase() !== email
+          ? "Email does not match the roster"
+          : "Account has already been activated",
+    });
+    return { error: "auth.registerRefused" };
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash: await hashPassword(password),
+      // Claimed: they chose this password, so there is nothing to force.
+      mustChangePassword: false,
+      status: "ACTIVE",
+      failedLoginCount: 0,
+      lockedUntil: null,
+    },
+  });
+
+  await audit({
+    actorId: user.id,
+    actorName: user.fullName,
+    action: "ACCOUNT_ACTIVATED",
+    entity: "User",
+    entityId: user.id,
+    summary: `${employeeCode} set their own password from the registration page`,
+  });
+
+  // Straight in, rather than bouncing them to a login form to retype what they
+  // just chose.
+  const sessionHours = Number((await getSettings())[SETTING_KEYS.SESSION_HOURS] ?? 12);
+  await createSession(user.id, sessionHours);
+  await recordLoginAttempt({ identifier: employeeCode, userId: user.id, success: true });
+  redirect("/");
 }
