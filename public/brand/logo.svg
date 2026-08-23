@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 553 780" role="img" aria-label="T&amp;C Garments">
+  <title>T&amp;C Garments</title>
+  <!--
+    The full company lockup, for certificates, exported reports and anywhere the
+    organisation is named rather than the platform. In-app chrome uses the mark
+    plus live text instead (see src/components/brand.tsx), so the platform name
+    stays editable from the branding config.
+
+    The wordmark is set rather than outlined, so it needs a heavy grotesque; the
+    stack falls back sensibly where Inter is not available.
+  -->
+  <rect x="72" y="68" width="415" height="143" fill="#ED1C24" />
+  <path
+    d="M78,722 A409,490 0 0 1 487,232 L487,378 C300,392 150,512 78,722 Z"
+    fill="#ED1C24"
+  />
+  <text
+    x="209" y="668"
+    font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+    font-size="118" font-weight="800" letter-spacing="-2" fill="#231F20"
+  >T&amp;C</text>
+  <text
+    x="262" y="716"
+    font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+    font-size="30" font-weight="500" letter-spacing="7.5" fill="#231F20"
+  >GARMENTS</text>
+</svg>

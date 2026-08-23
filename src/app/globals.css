@@ -1,26 +1,272 @@
 @import "tailwindcss";
 
+/*
+  Brand tokens. The values are injected at runtime from src/lib/branding.ts via
+  <BrandStyle/>, so changing a colour never means touching a component.
+  The fallbacks below keep the app usable if that style block is ever missing.
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --brand-red-logo: #ed1c24;
+  --brand-red: #d81b24;
+  --brand-red-dark: #b3151d;
+  --brand-red-soft: #feecec;
+  --brand-ink: #231f20;
+  --brand-charcoal: #3b3537;
+  --brand-muted: #6b6668;
+  --brand-line: #e6e3e4;
+  --brand-surface: #ffffff;
+  --brand-canvas: #f7f5f5;
+  --brand-success: #16794c;
+  --brand-warning: #b26a00;
+  --brand-info: #1f5fa8;
+
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-pill: 999px;
+
+  /*
+    One depth model, applied consistently: surfaces that sit *in* the page are
+    flat with a hairline, and only surfaces that float *above* it cast a shadow.
+    Bordering and shadowing the same element is the thing that dates a UI.
+  */
+  --shadow-card: none;
+  --shadow-raised: 0 1px 2px rgb(22 24 29 / 0.04), 0 4px 12px rgb(22 24 29 / 0.06);
+  --shadow-pop: 0 12px 32px -8px rgb(22 24 29 / 0.18), 0 4px 12px -4px rgb(22 24 29 / 0.08);
+
+  /* Hairline that reads as a line, not a smudge, at 1 device pixel. */
+  --brand-line-strong: #d6d1d2;
+  /* Secondary text that is still comfortably readable on white. */
+  --brand-ink-soft: #4d4749;
+  --ring: 0 0 0 2px var(--brand-surface), 0 0 0 4px color-mix(in srgb, var(--brand-red) 55%, transparent);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-brand: var(--brand-red);
+  --color-brand-logo: var(--brand-red-logo);
+  --color-brand-dark: var(--brand-red-dark);
+  --color-brand-soft: var(--brand-red-soft);
+  --color-ink: var(--brand-ink);
+  --color-charcoal: var(--brand-charcoal);
+  --color-muted: var(--brand-muted);
+  --color-line: var(--brand-line);
+  --color-surface: var(--brand-surface);
+  --color-canvas: var(--brand-canvas);
+  --color-success: var(--brand-success);
+  --color-warning: var(--brand-warning);
+  --color-info: var(--brand-info);
+  --font-sans: var(--font-app-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--brand-canvas);
+  color: var(--brand-ink);
+  font-family: var(--font-app-sans), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  /* Inter's single-storey a/g and disambiguated l — quieter at small sizes. */
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  /* A touch of negative tracking is what separates a set page from a default one. */
+  letter-spacing: -0.006em;
+}
+
+/* Headings tighten further; the larger the type, the more it wants closing up. */
+:where(h1, h2, h3) {
+  letter-spacing: -0.018em;
+}
+
+/*
+  Figures line up in columns — stat cards, tables, progress readouts. Inter's
+  proportional digits make those ragged, so anything numeric opts in.
+*/
+.tabular,
+.data-table td,
+th[data-numeric] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Arabic reads better with a slightly larger line box, and does not want the
+   Latin tracking applied to it. */
+html[dir="rtl"] body {
+  line-height: 1.75;
+  letter-spacing: 0;
+}
+html[dir="rtl"] :where(h1, h2, h3) {
+  letter-spacing: 0;
+}
+
+/*
+  Focus: a two-tone ring that follows the element's own corner radius instead of
+  a hard square outline. Reads as part of the design rather than a browser default.
+*/
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+/* Windows high-contrast mode ignores box-shadow, so keep a real outline there. */
+@media (forced-colors: active) {
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .card {
+    background: var(--brand-surface);
+    border: 1px solid var(--brand-line);
+    border-radius: var(--radius-card);
+  }
+
+  .card-flat {
+    background: var(--brand-surface);
+    border: 1px solid var(--brand-line);
+    border-radius: var(--radius-card);
+  }
+
+  /* For the few surfaces that genuinely float: drawers, popovers, menus. */
+  .card-raised {
+    background: var(--brand-surface);
+    border: 1px solid var(--brand-line);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-raised);
+  }
+
+  /* An interactive card — a course tile, a list row that navigates. */
+  .card-interactive {
+    transition:
+      border-color 140ms ease,
+      background-color 140ms ease;
+  }
+  .card-interactive:hover {
+    border-color: var(--brand-line-strong);
+    background: color-mix(in srgb, var(--brand-canvas) 45%, var(--brand-surface));
+  }
+
+  .field {
+    width: 100%;
+    border: 1px solid var(--brand-line);
+    border-radius: var(--radius-control);
+    background: var(--brand-surface);
+    padding: 0.625rem 0.75rem;
+    font-size: 0.9375rem;
+    color: var(--brand-ink);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
+  .field::placeholder {
+    color: color-mix(in srgb, var(--brand-muted) 75%, transparent);
+  }
+  .field:focus {
+    border-color: var(--brand-red);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-red) 14%, transparent);
+    outline: none;
+  }
+  .field[aria-invalid="true"] {
+    border-color: var(--brand-red);
+    background: var(--brand-red-soft);
+  }
+
+  .label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--brand-charcoal);
+    margin-bottom: 0.375rem;
+  }
+
+  .hint {
+    font-size: 0.8125rem;
+    color: var(--brand-muted);
+  }
+
+  /*
+    Card eyebrow. Uppercase micro-type is fine *here* — one short label above a
+    card, generously tracked — and it is the thing that makes a panel feel
+    considered. It is not fine on every table header (see below).
+  */
+  .section-title {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--brand-muted);
+  }
+
+  /*
+    Table shell used by every admin list.
+
+    Headers are sentence case, not uppercase micro-type: rows of tiny tracked
+    capitals are the single strongest visual cue that something is an ERP
+    screen, and the brief asks for the opposite. Sentence case at a readable
+    size scans faster and looks current.
+  */
+  .data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.875rem;
+  }
+  .data-table thead th {
+    text-align: start;
+    font-weight: 500;
+    color: var(--brand-muted);
+    font-size: 0.8125rem;
+    padding: 0.6875rem 1rem;
+    background: color-mix(in srgb, var(--brand-canvas) 60%, var(--brand-surface));
+    border-bottom: 1px solid var(--brand-line);
+    white-space: nowrap;
+  }
+  .data-table thead th:first-child {
+    border-start-start-radius: calc(var(--radius-card) - 1px);
+  }
+  .data-table thead th:last-child {
+    border-start-end-radius: calc(var(--radius-card) - 1px);
+  }
+  .data-table tbody td {
+    padding: 0.8125rem 1rem;
+    border-bottom: 1px solid var(--brand-line);
+    vertical-align: middle;
+  }
+  .data-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  .data-table tbody tr {
+    transition: background-color 120ms ease;
+  }
+  .data-table tbody tr:hover {
+    background: color-mix(in srgb, var(--brand-canvas) 70%, var(--brand-surface));
+  }
+}
+
+/* Progress bars carry a text label everywhere, so colour is never the only cue. */
+.progress-track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--brand-line) 80%, var(--brand-canvas));
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--brand-red);
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }

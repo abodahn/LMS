@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 415 654" role="img" aria-label="T&amp;C Garments">
+  <title>T&amp;C Garments</title>
+  <!--
+    The T&C mark: a hard rectangle above a sweep that tapers to a point.
+
+    The sweep's outer edge is a true elliptical arc centred on the bottom-right
+    corner (415, 654), so it meets the rectangle's right edge exactly vertical
+    and the tip exactly horizontal. The inner edge is a Bézier because the band
+    is not constant width — it is thick at the top and closes to a point.
+
+    Colour is the brand red at full strength (#ED1C24). The UI red is a shade
+    deeper so white text on it clears AA; see src/lib/branding.ts.
+  -->
+  <rect x="0" y="0" width="415" height="143" fill="#ED1C24" />
+  <path
+    d="M6,654 A409,490 0 0 1 415,164 L415,310 C228,324 78,444 6,654 Z"
+    fill="#ED1C24"
+  />
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Verified certificate seal">
+  <title>Verified certificate seal</title>
+  <!--
+    Certificate seal. Built from the same two elements as the mark — a hard
+    block and a sweep — so a certificate is recognisably from the same family
+    as the platform chrome, without repeating the full lockup at a size where
+    the wordmark would not survive.
+  -->
+  <circle cx="60" cy="60" r="56" fill="none" stroke="#ED1C24" stroke-width="2" />
+  <circle cx="60" cy="60" r="49" fill="none" stroke="#231F20" stroke-width="0.75" />
+
+  <g transform="translate(48 26) scale(0.0555)">
+    <rect x="0" y="0" width="415" height="143" fill="#ED1C24" />
+    <path d="M6,654 A409,490 0 0 1 415,164 L415,310 C228,324 78,444 6,654 Z" fill="#ED1C24" />
+  </g>
+
+  <text
+    x="60" y="83"
+    font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+    font-size="8.5" font-weight="700" fill="#231F20" text-anchor="middle" letter-spacing="0.6"
+  >AI ACADEMY</text>
+  <text
+    x="60" y="94"
+    font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+    font-size="6" font-weight="500" fill="#6B6668" text-anchor="middle" letter-spacing="1.6"
+  >VERIFIED</text>
+</svg>

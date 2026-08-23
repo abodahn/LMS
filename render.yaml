@@ -1,0 +1,85 @@
+# T&C AI Academy — Render Blueprint
+#
+# Render suits this application considerably better than a serverless host does,
+# and the reasons are all things the app already assumes:
+#
+#   - it runs as one long-lived process, so the in-app scheduler in
+#     src/instrumentation.ts genuinely works — no external cron to wire up;
+#   - a persistent disk means uploads, SCORM packages and the SQLite file all
+#     survive a deploy, which is exactly what the Dockerfile was written for;
+#   - rate limiting is in-memory and the disk is local, both of which are
+#     correct on a single instance and wrong on a fleet.
+#
+# The disk is what makes this work. A Render service without one has an
+# ephemeral filesystem, and the database would be discarded on every deploy.
+#
+# To use: push this repository to GitHub, then Render → New → Blueprint → pick
+# the repo. Everything below is applied automatically except the values marked
+# `sync: false`, which Render will prompt for.
+
+services:
+  - type: web
+    name: tc-ai-academy
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    # A disk cannot attach to more than one instance, so the plan has to be one
+    # that does not scale horizontally. Starter is the smallest with a disk.
+    plan: starter
+    region: frankfurt
+    branch: main
+    healthCheckPath: /api/health
+
+    disk:
+      name: tcai-data
+      mountPath: /data
+      # The database is small; the space is for SCORM packages and uploads.
+      sizeGB: 10
+
+    envVars:
+      # SQLite on the mounted disk. To move to Postgres later: add a Render
+      # Postgres instance, set this to its internal URL, change `provider` in
+      # prisma/schema.prisma, and regenerate the migrations. The schema is
+      # already portable — no native enums, no JSON columns.
+      - key: DATABASE_URL
+        value: file:/data/academy.db
+
+      - key: STORAGE_DIR
+        value: /data/storage
+
+      - key: NODE_ENV
+        value: production
+
+      # The in-process scheduler. On for exactly the reason above: one instance,
+      # one timer. Set to "off" if this service is ever scaled beyond one.
+      - key: SCHEDULER
+        value: "on"
+
+      # Certificate QR codes encode an absolute URL, so this has to be the real
+      # public address or a verifier scanning a certificate lands nowhere.
+      - key: APP_URL
+        fromService:
+          type: web
+          name: tc-ai-academy
+          envVarKey: RENDER_EXTERNAL_URL
+
+      - key: APP_VERSION
+        value: "1.0.0"
+
+      - key: MAX_UPLOAD_BYTES
+        value: "8388608"
+
+      - key: MAX_SCORM_BYTES
+        value: "209715200"
+
+      # No demo employees on a real instance. Turn this on deliberately if the
+      # first deploy is meant as a demonstration.
+      - key: SEED_DEMO
+        value: "false"
+
+      # Optional, prompted at deploy time. Left unset the AI coach stays off and
+      # password-reset links are written to the log instead of being emailed —
+      # both degrade cleanly rather than breaking.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false

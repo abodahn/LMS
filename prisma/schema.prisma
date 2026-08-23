@@ -1,0 +1,1384 @@
+// T&C AI Academy — data model
+// Provider note: written to be portable. To move to PostgreSQL change the
+// `provider` below to "postgresql" and point DATABASE_URL at the server.
+// No native enums / scalar lists / Json columns are used, so the same schema
+// validates on both engines. See docs/ARCHITECTURE.md.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// Identity, org structure, RBAC
+// ---------------------------------------------------------------------------
+
+model User {
+  id                 String    @id @default(cuid())
+  employeeCode       String    @unique
+  email              String    @unique
+  username           String?   @unique
+  passwordHash       String
+  fullName           String
+  fullNameAr         String?
+  avatarUrl          String?
+  status             String    @default("ACTIVE") // ACTIVE | INACTIVE | INVITED
+  mustChangePassword Boolean   @default(false)
+  failedLoginCount   Int       @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  preferredLanguage  String    @default("en") // en | ar | tr
+  departmentId       String?
+  sectionId          String?
+  jobTitleId         String?
+  locationId         String?
+  managerId          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  department Department? @relation(fields: [departmentId], references: [id])
+  section    Section?    @relation(fields: [sectionId], references: [id])
+  jobTitle   JobTitle?   @relation(fields: [jobTitleId], references: [id])
+  location   Location?   @relation(fields: [locationId], references: [id])
+  manager    User?       @relation("ManagerReports", fields: [managerId], references: [id])
+  reports    User[]      @relation("ManagerReports")
+
+  profile             EmployeeProfile?
+  roles               UserRole[]
+  sessions            Session[]
+  resetTokens         PasswordResetToken[]
+  attempts            AssessmentAttempt[]
+  enrollments         Enrollment[]              @relation("Learner")
+  assignedEnrollments Enrollment[]              @relation("AssignedBy")
+  recommendations     Recommendation[]
+  recommendationRuns  RecommendationRun[]
+  certificates        Certificate[]             @relation("CertificateHolder")
+  revokedCertificates Certificate[]             @relation("CertificateRevoker")
+  submissions         AssignmentSubmission[]    @relation("Submitter")
+  reviewedSubmissions AssignmentSubmission[]    @relation("SubmissionReviewer")
+  feedback            CourseFeedback[]
+  notifications       Notification[]
+  badges              UserBadge[]
+  savedPrompts        SavedPrompt[]
+  notes               UserNote[]
+  bookmarks           UseCaseBookmark[]
+  goals               UserLearningGoal[]
+  learningPlan        LearningPlan?
+  activities          LearningActivity[]
+  historicalTraining  HistoricalTraining[]      @relation("TraineeHistory")
+  recordedTraining    HistoricalTraining[]      @relation("HistoryRecorder")
+  auditLogs           AuditLog[]
+  loginAudits         LoginAudit[]
+  courseVerifications CourseVerification[]
+  reviewedProofs      ExternalCompletionProof[] @relation("ProofReviewer")
+  createdCourses      Course[]                  @relation("CourseAuthor")
+  createdPaths        LearningPath[]            @relation("PathAuthor")
+  createdPrompts      PromptTemplate[]          @relation("PromptAuthor")
+  createdUseCases     AiUseCase[]               @relation("UseCaseAuthor")
+  ownedOpportunities  AiOpportunity[]           @relation("OpportunityOwner")
+  scormStates         ScormState[]              @relation("ScormLearner")
+  scormUploads        ScormPackage[]            @relation("ScormUploader")
+  sessionsTaught      TrainingSession[]         @relation("SessionInstructor")
+  sessionsCreated     TrainingSession[]         @relation("SessionAuthor")
+  sessionSeats        SessionRegistration[]     @relation("SessionAttendee")
+  attendanceMarked    SessionRegistration[]     @relation("AttendanceMarker")
+
+  @@index([departmentId])
+  @@index([managerId])
+  @@index([status])
+}
+
+model Role {
+  id          String  @id @default(cuid())
+  key         String  @unique // EMPLOYEE | MANAGER | ADMIN | SUPER_ADMIN
+  name        String
+  description String?
+  rank        Int     @default(0)
+  isSystem    Boolean @default(true)
+
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  group       String
+  description String?
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model Department {
+  id        String  @id @default(cuid())
+  code      String  @unique
+  name      String
+  nameAr    String?
+  nameTr    String?
+  jobFamily String  @default("GENERAL")
+  colorHint String?
+  order     Int     @default(0)
+
+  users         User[]
+  sections      Section[]
+  jobTitles     JobTitle[]
+  courseLinks   CourseDepartment[]
+  prompts       PromptTemplate[]
+  useCases      AiUseCase[]
+  opportunities AiOpportunity[]
+}
+
+model Section {
+  id           String     @id @default(cuid())
+  name         String
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  users        User[]
+
+  @@unique([departmentId, name])
+}
+
+model JobTitle {
+  id           String      @id @default(cuid())
+  name         String      @unique
+  jobFamily    String // FINANCE | HR | PRODUCTION | QUALITY | SUPPLY_CHAIN | SALES_MARKETING | MANAGEMENT | IT | GENERAL
+  isTechnical  Boolean     @default(false)
+  isManagerial Boolean     @default(false)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  users        User[]
+}
+
+model Location {
+  id       String            @id @default(cuid())
+  name     String            @unique
+  country  String?
+  users    User[]
+  sessions TrainingSession[]
+}
+
+model EmployeeProfile {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  yearsExperience     Int?
+  aiExperience        String    @default("NONE") // NONE | TRIED | OCCASIONAL | REGULAR | ADVANCED
+  isTechnical         Boolean   @default(false)
+  weeklyLearningHours Float     @default(2)
+  mainTasks           String?
+  onboardingStep      String    @default("PROFILE") // PROFILE | ASSESSMENT | GOALS | PATH | DONE
+  onboardedAt         DateTime?
+  hireDate            DateTime?
+  phone               String?
+  managerGoals        String?
+  updatedAt           DateTime  @updatedAt
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  ip        String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model LoginAudit {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  identifier String
+  success    Boolean
+  reason     String?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Competencies, levels, assessments
+// ---------------------------------------------------------------------------
+
+model Competency {
+  id          String  @id @default(cuid())
+  key         String  @unique // FUNDAMENTALS | WORKPLACE | PROMPTING | RESPONSIBLE_AI | DATA_AUTOMATION | TECHNICAL
+  name        String
+  nameAr      String?
+  nameTr      String?
+  description String?
+  weight      Float   @default(0.2)
+  order       Int     @default(0)
+  isCore      Boolean @default(true)
+
+  questions   AssessmentQuestion[]
+  scores      AssessmentScore[]
+  courseLinks CourseCompetency[]
+  pools       AssessmentPool[]
+}
+
+model SkillLevel {
+  id          String  @id @default(cuid())
+  code        String  @unique // L0..L4
+  name        String
+  nameAr      String?
+  nameTr      String?
+  description String
+  minScore    Float
+  maxScore    Float
+  order       Int
+  focusAreas  String  @default("[]")
+
+  attempts     AssessmentAttempt[]
+  courses      Course[]
+  paths        LearningPath[]
+  certificates Certificate[]
+}
+
+model AssessmentDefinition {
+  id                 String   @id @default(cuid())
+  key                String   @unique
+  title              String
+  titleAr            String?
+  titleTr            String?
+  description        String?
+  descriptionAr      String?
+  descriptionTr      String?
+  type               String // PLACEMENT | TECHNICAL | MODULE | FINAL | RESPONSIBLE_AI
+  durationMinutes    Int      @default(25)
+  questionCount      Int      @default(25)
+  passingScore       Float    @default(70)
+  maxAttempts        Int      @default(3)
+  cooldownMinutes    Int      @default(0)
+  randomizeQuestions Boolean  @default(true)
+  randomizeOptions   Boolean  @default(true)
+  isAdaptive         Boolean  @default(false)
+  status             String   @default("PUBLISHED") // DRAFT | PUBLISHED | ARCHIVED
+  courseId           String?
+  moduleId           String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  course    Course?              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module    CourseModule?        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  pools     AssessmentPool[]
+  attempts  AssessmentAttempt[]
+  questions AssessmentQuestion[]
+}
+
+model QuestionBank {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  name        String
+  description String?
+
+  questions AssessmentQuestion[]
+  pools     AssessmentPool[]
+}
+
+model AssessmentQuestion {
+  id           String   @id @default(cuid())
+  bankId       String?
+  definitionId String?
+  competencyId String
+  type         String // SINGLE | MULTI | TRUE_FALSE | SCENARIO | MATCHING | SHORT_ANSWER | PROMPT_TASK
+  difficulty   String   @default("MEDIUM") // EASY | MEDIUM | ADVANCED
+  text         String
+  textAr       String?
+  textTr       String?
+  explanation  String?
+  points       Float    @default(1)
+  status       String   @default("PUBLISHED")
+  tags         String   @default("[]")
+  rubricId     String?
+  isTechnical  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  bank             QuestionBank?         @relation(fields: [bankId], references: [id], onDelete: SetNull)
+  definition       AssessmentDefinition? @relation(fields: [definitionId], references: [id], onDelete: SetNull)
+  competency       Competency            @relation(fields: [competencyId], references: [id])
+  rubric           Rubric?               @relation(fields: [rubricId], references: [id])
+  options          QuestionOption[]
+  answers          AssessmentAnswer[]
+  attemptQuestions AttemptQuestion[]
+
+  @@index([competencyId, difficulty])
+  @@index([bankId])
+}
+
+model QuestionOption {
+  id         String  @id @default(cuid())
+  questionId String
+  text       String
+  textAr     String?
+  textTr     String?
+  isCorrect  Boolean @default(false)
+  order      Int     @default(0)
+  feedback   String?
+  matchKey   String?
+
+  question AssessmentQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId])
+}
+
+model Rubric {
+  id       String @id @default(cuid())
+  key      String @unique
+  name     String
+  criteria String // JSON [{key,label,weight,description}]
+
+  questions   AssessmentQuestion[]
+  assignments Assignment[]
+}
+
+model AssessmentPool {
+  id           String  @id @default(cuid())
+  definitionId String
+  competencyId String
+  difficulty   String?
+  // Scopes the pool to one question bank. The placement assessment draws only
+  // from the easy, fully-translated placement bank; the final exam draws from
+  // the core bank. Null means "any bank", which is the old behaviour.
+  bankId       String?
+  count        Int     @default(5)
+
+  definition AssessmentDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  competency Competency           @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+  bank       QuestionBank?        @relation(fields: [bankId], references: [id], onDelete: SetNull)
+}
+
+model AssessmentAttempt {
+  id               String    @id @default(cuid())
+  definitionId     String
+  userId           String
+  status           String    @default("IN_PROGRESS") // IN_PROGRESS | SUBMITTED | GRADED | ABANDONED
+  isBaseline       Boolean   @default(false)
+  startedAt        DateTime  @default(now())
+  expiresAt        DateTime?
+  submittedAt      DateTime?
+  gradedAt         DateTime?
+  totalScore       Float     @default(0)
+  maxScore         Float     @default(0)
+  percentage       Float     @default(0)
+  passed           Boolean   @default(false)
+  levelId          String?
+  timeSpentSeconds Int       @default(0)
+  currentIndex     Int       @default(0)
+  attemptNumber    Int       @default(1)
+  meta             String    @default("{}")
+
+  definition   AssessmentDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level        SkillLevel?          @relation(fields: [levelId], references: [id])
+  questions    AttemptQuestion[]
+  answers      AssessmentAnswer[]
+  scores       AssessmentScore[]
+  certificates Certificate[]
+
+  @@index([userId, definitionId])
+  @@index([status])
+}
+
+model AttemptQuestion {
+  id          String @id @default(cuid())
+  attemptId   String
+  questionId  String
+  order       Int
+  optionOrder String @default("[]")
+
+  attempt  AssessmentAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question AssessmentQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId, order])
+}
+
+model AssessmentAnswer {
+  id                String   @id @default(cuid())
+  attemptId         String
+  questionId        String
+  selectedOptionIds String   @default("[]")
+  textAnswer        String?
+  isCorrect         Boolean  @default(false)
+  score             Float    @default(0)
+  maxScore          Float    @default(1)
+  rubricScores      String?
+  feedback          String?
+  gradedById        String?
+  answeredAt        DateTime @default(now())
+
+  attempt  AssessmentAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question AssessmentQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+}
+
+model AssessmentScore {
+  id           String @id @default(cuid())
+  attemptId    String
+  competencyId String
+  rawScore     Float
+  maxScore     Float
+  percentage   Float
+
+  attempt    AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  competency Competency        @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, competencyId])
+}
+
+// ---------------------------------------------------------------------------
+// Course catalog
+// ---------------------------------------------------------------------------
+
+model CourseProvider {
+  id         String  @id @default(cuid())
+  key        String  @unique
+  name       String
+  website    String?
+  logoUrl    String?
+  trustScore Float   @default(0.8)
+
+  courses Course[]
+}
+
+model CourseCategory {
+  id    String @id @default(cuid())
+  key   String @unique
+  name  String
+  order Int    @default(0)
+
+  courses Course[]
+}
+
+model Course {
+  id                   String    @id @default(cuid())
+  code                 String    @unique
+  slug                 String    @unique
+  title                String
+  titleAr              String?
+  titleTr              String?
+  description          String
+  descriptionAr        String?
+  descriptionTr        String?
+  outcomes             String    @default("[]")
+  outcomesAr           String    @default("[]")
+  outcomesTr           String    @default("[]")
+  providerId           String
+  platform             String
+  url                  String?
+  thumbnailUrl         String?
+  language             String    @default("en")
+  difficulty           String    @default("BEGINNER") // BEGINNER | INTERMEDIATE | ADVANCED
+  estimatedHours       Float     @default(1)
+  isFree               Boolean   @default(true)
+  price                Float?
+  currency             String    @default("USD")
+  certificateAvailable Boolean   @default(false)
+  certificateCost      Float?
+  aiLevelId            String?
+  categoryId           String?
+  status               String    @default("PUBLISHED") // DRAFT | PUBLISHED | ARCHIVED
+  isInternal           Boolean   @default(false)
+  isMandatory          Boolean   @default(false)
+  isRecommended        Boolean   @default(false)
+  isTechnical          Boolean   @default(false)
+  youtubePlaylistId    String?
+  rating               Float?
+  ratingSource         String?
+  qualityScore         Float     @default(0.7)
+  lastVerifiedAt       DateTime?
+  verifiedById         String?
+  linkWorking          Boolean   @default(true)
+  // Consecutive failures from the automated sweep; reset by any successful
+  // check. A course is withdrawn once this reaches STRIKES_BEFORE_UNPUBLISH,
+  // so one bad minute at a provider cannot empty the catalogue.
+  linkFailCount        Int       @default(0)
+  linkNote             String?
+  stillAvailable       Boolean   @default(true)
+  reviewIntervalDays   Int       @default(180)
+  createdById          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  provider  CourseProvider  @relation(fields: [providerId], references: [id])
+  category  CourseCategory? @relation(fields: [categoryId], references: [id])
+  aiLevel   SkillLevel?     @relation(fields: [aiLevelId], references: [id])
+  createdBy User?           @relation("CourseAuthor", fields: [createdById], references: [id])
+
+  modules         CourseModule[]
+  prerequisites   CoursePrerequisite[]   @relation("CourseSide")
+  requiredBy      CoursePrerequisite[]   @relation("PrerequisiteSide")
+  competencies    CourseCompetency[]
+  departments     CourseDepartment[]
+  jobFamilies     CourseJobFamily[]
+  goals           CourseGoal[]
+  languages       CourseLanguage[]
+  pathCourses     LearningPathCourse[]
+  enrollments     Enrollment[]
+  recommendations Recommendation[]
+  assessments     AssessmentDefinition[]
+  assignments     Assignment[]
+  feedback        CourseFeedback[]
+  certificates    Certificate[]
+  verifications   CourseVerification[]
+  sessions        TrainingSession[]
+  notes           UserNote[]
+
+  @@index([status])
+  @@index([providerId])
+  @@index([aiLevelId])
+}
+
+model CoursePrerequisite {
+  id             String @id @default(cuid())
+  courseId       String
+  prerequisiteId String
+
+  course       Course @relation("CourseSide", fields: [courseId], references: [id], onDelete: Cascade)
+  prerequisite Course @relation("PrerequisiteSide", fields: [prerequisiteId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, prerequisiteId])
+}
+
+model CourseCompetency {
+  id           String @id @default(cuid())
+  courseId     String
+  competencyId String
+  weight       Float  @default(1)
+
+  course     Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  competency Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, competencyId])
+}
+
+model CourseDepartment {
+  id           String @id @default(cuid())
+  courseId     String
+  departmentId String
+  weight       Float  @default(1)
+
+  course     Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, departmentId])
+}
+
+model CourseJobFamily {
+  id        String @id @default(cuid())
+  courseId  String
+  jobFamily String
+  weight    Float  @default(1)
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, jobFamily])
+}
+
+model CourseGoal {
+  id       String @id @default(cuid())
+  courseId String
+  goalKey  String
+  weight   Float  @default(1)
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, goalKey])
+}
+
+model CourseLanguage {
+  id         String  @id @default(cuid())
+  courseId   String
+  language   String
+  isSubtitle Boolean @default(false)
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, language, isSubtitle])
+}
+
+model CourseModule {
+  id          String  @id @default(cuid())
+  courseId    String
+  title       String
+  titleAr     String?
+  titleTr     String?
+  description String?
+  order       Int     @default(0)
+
+  course      Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     CourseLesson[]
+  assessments AssessmentDefinition[]
+  assignments Assignment[]
+
+  @@index([courseId, order])
+}
+
+model CourseLesson {
+  id              String  @id @default(cuid())
+  moduleId        String
+  title           String
+  titleAr         String?
+  titleTr         String?
+  type            String // TEXT | VIDEO | YOUTUBE | PDF | IMAGE | EXTERNAL | FILE | QUIZ | ASSIGNMENT | TASK
+  content         String?
+  contentAr       String?
+  contentTr       String?
+  url             String?
+  durationMinutes Int     @default(10)
+  isRequired      Boolean @default(true)
+  order           Int     @default(0)
+  resources       String  @default("[]")
+
+  module      CourseModule     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  scorm       ScormPackage?
+  progress    LessonProgress[]
+  assignments Assignment[]
+  notes       UserNote[]
+
+  @@index([moduleId, order])
+}
+
+model CourseVerification {
+  id              String   @id @default(cuid())
+  courseId        String
+  verifiedById    String
+  verifiedAt      DateTime @default(now())
+  linkWorking     Boolean  @default(true)
+  stillAvailable  Boolean  @default(true)
+  durationUpdated Boolean  @default(false)
+  priceUpdated    Boolean  @default(false)
+  ratingUpdated   Boolean  @default(false)
+  archived        Boolean  @default(false)
+  notes           String?
+
+  course     Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  verifiedBy User   @relation(fields: [verifiedById], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// Learning paths
+// ---------------------------------------------------------------------------
+
+model LearningPath {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  title         String
+  titleAr       String?
+  titleTr       String?
+  description   String
+  targetHours   Float    @default(35)
+  targetLevelId String?
+  audienceLevel String?
+  jobFamilies   String   @default("[]")
+  status        String   @default("PUBLISHED")
+  isDefault     Boolean  @default(false)
+  isTechnical   Boolean  @default(false)
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  targetLevel     SkillLevel?          @relation(fields: [targetLevelId], references: [id])
+  createdBy       User?                @relation("PathAuthor", fields: [createdById], references: [id])
+  phases          LearningPathPhase[]
+  courses         LearningPathCourse[]
+  enrollments     Enrollment[]
+  recommendations Recommendation[]
+  plans           LearningPlan[]
+  certificates    Certificate[]
+}
+
+model LearningPathPhase {
+  id          String  @id @default(cuid())
+  pathId      String
+  title       String
+  titleAr     String?
+  titleTr     String?
+  description String?
+  order       Int     @default(0)
+
+  path    LearningPath         @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  courses LearningPathCourse[]
+}
+
+model LearningPathCourse {
+  id           String  @id @default(cuid())
+  pathId       String
+  phaseId      String?
+  courseId     String
+  order        Int     @default(0)
+  isRequired   Boolean @default(true)
+  sequenceLock Boolean @default(false)
+  minScore     Float?
+
+  path   LearningPath       @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  phase  LearningPathPhase? @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  course Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([pathId, courseId])
+}
+
+// ---------------------------------------------------------------------------
+// Recommendation engine
+// ---------------------------------------------------------------------------
+
+model RecommendationWeight {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  label       String
+  weight      Float
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model RecommendationRun {
+  id            String   @id @default(cuid())
+  userId        String
+  generatedAt   DateTime @default(now())
+  engineVersion String   @default("1.0.0")
+  totalHours    Float    @default(0)
+  targetHours   Float    @default(35)
+  inputSnapshot String   @default("{}")
+  rejected      String   @default("[]")
+  pathId        String?
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recommendations Recommendation[]
+
+  @@index([userId, generatedAt])
+}
+
+model Recommendation {
+  id        String   @id @default(cuid())
+  runId     String
+  userId    String
+  courseId  String?
+  pathId    String?
+  score     Float
+  rank      Int
+  phase     String?
+  status    String   @default("SUGGESTED") // SUGGESTED | ENROLLED | DISMISSED
+  createdAt DateTime @default(now())
+
+  run     RecommendationRun      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  user    User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course  Course?                @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  path    LearningPath?          @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  reasons RecommendationReason[]
+
+  @@index([userId, status])
+}
+
+model RecommendationReason {
+  id               String  @id @default(cuid())
+  recommendationId String
+  code             String
+  label            String
+  contribution     Float   @default(0)
+  detail           String?
+
+  recommendation Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Enrollment, progress, assignments
+// ---------------------------------------------------------------------------
+
+model Enrollment {
+  id               String    @id @default(cuid())
+  userId           String
+  courseId         String
+  pathId           String?
+  source           String    @default("SELF") // RECOMMENDED | SELF | ASSIGNED | MANDATORY
+  status           String    @default("NOT_STARTED") // NOT_STARTED | IN_PROGRESS | PENDING_VERIFICATION | COMPLETED | DROPPED
+  enrolledAt       DateTime  @default(now())
+  startedAt        DateTime?
+  dueAt            DateTime?
+  completedAt      DateTime?
+  progressPercent  Float     @default(0)
+  timeSpentMinutes Int       @default(0)
+  lastAccessedAt   DateTime?
+  assignedById     String?
+  selfReportedDone Boolean   @default(false)
+  order            Int       @default(0)
+  phase            String?
+
+  user       User          @relation("Learner", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy User?         @relation("AssignedBy", fields: [assignedById], references: [id])
+  course     Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  path       LearningPath? @relation(fields: [pathId], references: [id], onDelete: SetNull)
+
+  lessonProgress LessonProgress[]
+  proofs         ExternalCompletionProof[]
+  feedback       CourseFeedback?
+  scormStates    ScormState[]
+
+  @@unique([userId, courseId])
+  @@index([userId, status])
+  @@index([courseId])
+}
+
+model LessonProgress {
+  id           String    @id @default(cuid())
+  enrollmentId String
+  lessonId     String
+  status       String    @default("NOT_STARTED")
+  secondsSpent Int       @default(0)
+  lastPosition Int       @default(0)
+  completedAt  DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  enrollment Enrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson     CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+}
+
+model LearningActivity {
+  id               String   @id @default(cuid())
+  userId           String
+  day              String // YYYY-MM-DD keeps streak math trivial and portable
+  minutes          Int      @default(0)
+  lessonsCompleted Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day])
+  @@index([day])
+}
+
+model ExternalCompletionProof {
+  id           String    @id @default(cuid())
+  enrollmentId String
+  fileName     String
+  filePath     String
+  mimeType     String
+  sizeBytes    Int
+  note         String?
+  status       String    @default("PENDING") // PENDING | VERIFIED | REJECTED
+  reviewedById String?
+  reviewedAt   DateTime?
+  reviewNote   String?
+  uploadedAt   DateTime  @default(now())
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  reviewedBy User?      @relation("ProofReviewer", fields: [reviewedById], references: [id])
+}
+
+model Assignment {
+  id           String  @id @default(cuid())
+  key          String  @unique
+  courseId     String?
+  moduleId     String?
+  lessonId     String?
+  title        String
+  instructions String
+  type         String  @default("ASSIGNMENT") // ASSIGNMENT | CAPSTONE | PROMPT_TASK
+  rubricId     String?
+  maxScore     Float   @default(100)
+  passingScore Float   @default(70)
+  jobFamily    String?
+
+  course      Course?                @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module      CourseModule?          @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  lesson      CourseLesson?          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  rubric      Rubric?                @relation(fields: [rubricId], references: [id])
+  submissions AssignmentSubmission[]
+}
+
+model AssignmentSubmission {
+  id           String    @id @default(cuid())
+  assignmentId String
+  userId       String
+  content      String    @default("{}")
+  filePath     String?
+  fileName     String?
+  status       String    @default("DRAFT") // DRAFT | SUBMITTED | UNDER_REVIEW | APPROVED | NEEDS_WORK
+  score        Float?
+  rubricScores String?
+  feedback     String?
+  reviewedById String?
+  submittedAt  DateTime?
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  assignment  Assignment     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user        User           @relation("Submitter", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy  User?          @relation("SubmissionReviewer", fields: [reviewedById], references: [id])
+  opportunity AiOpportunity?
+
+  @@unique([assignmentId, userId])
+}
+
+model CourseFeedback {
+  id             String   @id @default(cuid())
+  enrollmentId   String   @unique
+  userId         String
+  courseId       String
+  usefulness     Int
+  wouldRecommend Boolean
+  relevance      Int
+  comment        String?
+  createdAt      DateTime @default(now())
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course     Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Certificates & records
+// ---------------------------------------------------------------------------
+
+model Certificate {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  userId        String
+  type          String // COURSE | PATH | PROGRAM | RESPONSIBLE_AI
+  title         String
+  courseId      String?
+  pathId        String?
+  levelId       String?
+  attemptId     String?
+  learningHours Float     @default(0)
+  finalScore    Float?
+  issuedAt      DateTime  @default(now())
+  expiresAt     DateTime?
+  status        String    @default("VALID") // VALID | REVOKED | EXPIRED
+  revokedAt     DateTime?
+  revokedById   String?
+  revokeReason  String?
+
+  user      User               @relation("CertificateHolder", fields: [userId], references: [id], onDelete: Cascade)
+  revokedBy User?              @relation("CertificateRevoker", fields: [revokedById], references: [id])
+  course    Course?            @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  path      LearningPath?      @relation(fields: [pathId], references: [id], onDelete: SetNull)
+  level     SkillLevel?        @relation(fields: [levelId], references: [id])
+  attempt   AssessmentAttempt? @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+model HistoricalTraining {
+  id             String   @id @default(cuid())
+  userId         String
+  courseName     String
+  provider       String?
+  completedAt    DateTime
+  hours          Float    @default(0)
+  certificateUrl String?
+  note           String?
+  recordedById   String?
+  createdAt      DateTime @default(now())
+
+  user       User  @relation("TraineeHistory", fields: [userId], references: [id], onDelete: Cascade)
+  recordedBy User? @relation("HistoryRecorder", fields: [recordedById], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// Engagement: badges, notifications, toolbox, use cases
+// ---------------------------------------------------------------------------
+
+model Badge {
+  id          String @id @default(cuid())
+  key         String @unique
+  name        String
+  description String
+  icon        String @default("award")
+  tier        String @default("BRONZE")
+  criteria    String @default("{}")
+
+  users UserBadge[]
+}
+
+model UserBadge {
+  id       String   @id @default(cuid())
+  userId   String
+  badgeId  String
+  earnedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  category  String // LEARNING | ASSESSMENT | CERTIFICATE | MANAGER | SYSTEM
+  title     String
+  body      String
+  link      String?
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model ReminderRule {
+  id            String  @id @default(cuid())
+  key           String  @unique
+  name          String
+  description   String?
+  channel       String  @default("IN_APP") // IN_APP | EMAIL
+  triggerType   String // INACTIVITY | DUE_SOON | OVERDUE | ASSESSMENT_READY | MODULE_INCOMPLETE
+  thresholdDays Int     @default(7)
+  template      String
+  enabled       Boolean @default(true)
+}
+
+model PromptTemplate {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  title        String
+  titleAr      String?
+  titleTr      String?
+  body         String
+  bodyAr       String?
+  bodyTr       String?
+  description  String?
+  departmentId String?
+  taskCategory String
+  difficulty   String   @default("EASY")
+  tool         String   @default("ANY")
+  tags         String   @default("[]")
+  isApproved   Boolean  @default(true)
+  createdById  String?
+  createdAt    DateTime @default(now())
+
+  department Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdBy  User?         @relation("PromptAuthor", fields: [createdById], references: [id])
+  saved      SavedPrompt[]
+}
+
+model SavedPrompt {
+  id        String   @id @default(cuid())
+  userId    String
+  promptId  String?
+  title     String
+  body      String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prompt PromptTemplate? @relation(fields: [promptId], references: [id], onDelete: SetNull)
+}
+
+model UserNote {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String?
+  lessonId  String?
+  title     String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course?       @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  lesson CourseLesson? @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+}
+
+model AiUseCase {
+  id                     String   @id @default(cuid())
+  key                    String   @unique
+  title                  String
+  titleAr                String?
+  titleTr                String?
+  departmentId           String?
+  problem                String
+  howAiHelps             String
+  workflow               String
+  examplePrompt          String
+  dataSensitivityWarning String
+  estimatedTimeSaved     String?
+  difficulty             String   @default("EASY")
+  status                 String   @default("PUBLISHED")
+  createdById            String?
+  createdAt              DateTime @default(now())
+
+  department Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdBy  User?             @relation("UseCaseAuthor", fields: [createdById], references: [id])
+  bookmarks  UseCaseBookmark[]
+}
+
+model UseCaseBookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  useCaseId String
+  createdAt DateTime @default(now())
+
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  useCase AiUseCase @relation(fields: [useCaseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, useCaseId])
+}
+
+model AiOpportunity {
+  id                 String   @id @default(cuid())
+  submissionId       String?  @unique
+  departmentId       String?
+  title              String
+  problem            String
+  opportunity        String
+  impact             String   @default("MEDIUM")
+  complexity         String   @default("MEDIUM")
+  status             String   @default("IDENTIFIED")
+  ownerId            String?
+  hoursBefore        Float?
+  hoursAfter         Float?
+  hoursSavedMonthly  Float?
+  annualHoursSaved   Float?
+  financialBenefit   Float?
+  qualityImprovement String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  submission AssignmentSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  department Department?           @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  owner      User?                 @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+}
+
+model UserLearningGoal {
+  id       String @id @default(cuid())
+  userId   String
+  goalKey  String
+  priority Int    @default(1)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, goalKey])
+}
+
+model LearningPlan {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  pathId       String?
+  hoursPerWeek Float     @default(3)
+  startedAt    DateTime  @default(now())
+  targetDate   DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  path LearningPath? @relation(fields: [pathId], references: [id], onDelete: SetNull)
+}
+
+// ---------------------------------------------------------------------------
+// System
+// ---------------------------------------------------------------------------
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  type        String   @default("STRING") // STRING | NUMBER | BOOLEAN | JSON
+  group       String   @default("GENERAL")
+  label       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model Integration {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  type      String // AI_PROVIDER | SMTP | SSO | WEBHOOK
+  config    String   @default("{}")
+  enabled   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actorName String?
+  action    String
+  entity    String
+  entityId  String?
+  summary   String?
+  before    String?
+  after     String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+}
+
+// ---------------------------------------------------------------------------
+// SCORM
+// ---------------------------------------------------------------------------
+
+/// An uploaded SCORM package, unpacked on disk and attached to one lesson.
+model ScormPackage {
+  id           String   @id @default(cuid())
+  lessonId     String   @unique
+  version      String // 1.2 | 2004
+  title        String
+  /// Launch file, relative to the package root.
+  entryHref    String
+  /// Directory under STORAGE_ROOT holding the unpacked files.
+  storagePath  String
+  fileCount    Int      @default(0)
+  sizeBytes    Int      @default(0)
+  /// From the manifest; a score at or above this counts as passed.
+  masteryScore Float?
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  lesson     CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  uploadedBy User?        @relation("ScormUploader", fields: [uploadedById], references: [id])
+  states     ScormState[]
+}
+
+/// One learner's run through one package. The `cmi` blob is what the content
+/// wrote; the columns beside it are the few values the rest of the app reads,
+/// lifted out so a report never has to parse JSON.
+model ScormState {
+  id             String    @id @default(cuid())
+  packageId      String
+  enrollmentId   String
+  userId         String
+  cmi            String    @default("{}")
+  /// 1.2 vocabulary, which 2004 values are mapped onto:
+  /// passed | completed | failed | incomplete | browsed | not attempted
+  lessonStatus   String    @default("not attempted")
+  scoreRaw       Float?
+  scoreMin       Float?
+  scoreMax       Float?
+  location       String?
+  suspendData    String?
+  sessionSeconds Int       @default(0)
+  totalSeconds   Int       @default(0)
+  attempts       Int       @default(0)
+  completedAt    DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  package    ScormPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  enrollment Enrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  user       User         @relation("ScormLearner", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, enrollmentId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Instructor-led training
+// ---------------------------------------------------------------------------
+
+/// A scheduled session: a room and a date, optionally delivering a course.
+model TrainingSession {
+  id             String   @id @default(cuid())
+  courseId       String?
+  title          String
+  titleAr        String?
+  titleTr        String?
+  description    String?
+  descriptionAr  String?
+  descriptionTr  String?
+  startsAt       DateTime
+  endsAt         DateTime
+  timezone       String   @default("Africa/Cairo")
+  mode           String   @default("IN_PERSON") // IN_PERSON | ONLINE | HYBRID
+  locationId     String?
+  room           String?
+  meetingUrl     String?
+  instructorId   String?
+  /// For an external trainer who has no account here.
+  instructorName String?
+  capacity       Int      @default(20)
+  /// Registrations beyond capacity queue instead of being refused.
+  waitlistEnabled Boolean @default(true)
+  status         String   @default("SCHEDULED") // SCHEDULED | CANCELLED | COMPLETED
+  /// Hours credited on attendance; falls back to the session's own length.
+  creditHours    Float?
+  notes          String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  course     Course?   @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  instructor User?     @relation("SessionInstructor", fields: [instructorId], references: [id], onDelete: SetNull)
+  createdBy  User?     @relation("SessionAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  registrations SessionRegistration[]
+
+  @@index([startsAt])
+  @@index([courseId])
+  @@index([status, startsAt])
+}
+
+/// A seat, or a place in the queue for one.
+model SessionRegistration {
+  id             String    @id @default(cuid())
+  sessionId      String
+  userId         String
+  /// REGISTERED | WAITLISTED | CANCELLED | ATTENDED | ABSENT
+  status         String    @default("REGISTERED")
+  registeredAt   DateTime  @default(now())
+  /// Position in the queue; null once a seat is held.
+  waitlistOrder  Int?
+  attendanceById String?
+  attendanceAt   DateTime?
+  notes          String?
+
+  session  TrainingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user     User            @relation("SessionAttendee", fields: [userId], references: [id], onDelete: Cascade)
+  markedBy User?           @relation("AttendanceMarker", fields: [attendanceById], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, userId])
+  @@index([userId, status])
+}

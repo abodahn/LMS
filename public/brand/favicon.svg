@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="T&amp;C">
+  <title>T&amp;C</title>
+  <!--
+    Favicon: the mark alone, scaled into a square and given a little breathing
+    room so it survives at 16px. Same geometry as logo-mark.svg.
+  -->
+  <rect width="64" height="64" rx="13" fill="#231F20" />
+  <g transform="translate(21.5 11) scale(0.0509)">
+    <rect x="0" y="0" width="415" height="143" fill="#ED1C24" />
+    <path d="M6,654 A409,490 0 0 1 415,164 L415,310 C228,324 78,444 6,654 Z" fill="#ED1C24" />
+  </g>
+</svg>
