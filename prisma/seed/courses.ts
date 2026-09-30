@@ -24,6 +24,9 @@ const CATEGORIES = [
   { key: "COMMUNICATION", name: "Communication & Collaboration", order: 8 },
   { key: "LEADERSHIP", name: "Leadership & Management", order: 9 },
   { key: "PRODUCTIVITY", name: "Productivity & Personal Effectiveness", order: 10 },
+  // Egypt and Istanbul work together daily; language is operational here,
+  // not a perk.
+  { key: "LANGUAGES", name: "Languages", order: 11 },
 ];
 
 export type CourseSeed = {

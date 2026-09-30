@@ -644,16 +644,17 @@
     "ADVANCED": "İleri"
   },
   "category": {
+    "COMMUNICATION": "İletişim ve İş Birliği",
+    "DATA": "Veri ve Otomasyon",
     "FOUNDATIONS": "Yapay Zekâ Temelleri",
     "GENERATIVE_AI": "Üretken Yapay Zekâ",
-    "PROMPTING": "Prompt Yazımı",
-    "ROLE_SPECIFIC": "Rolünüz için Yapay Zekâ",
-    "RESPONSIBLE_AI": "Sorumlu Yapay Zekâ",
-    "DATA": "Veri ve Otomasyon",
-    "TECHNICAL": "Teknik Yapay Zekâ",
-    "COMMUNICATION": "İletişim ve İş Birliği",
+    "LANGUAGES": "Diller",
     "LEADERSHIP": "Liderlik ve Yönetim",
-    "PRODUCTIVITY": "Üretkenlik ve Kişisel Etkinlik"
+    "PRODUCTIVITY": "Üretkenlik ve Kişisel Etkinlik",
+    "PROMPTING": "Prompt Yazımı",
+    "RESPONSIBLE_AI": "Sorumlu Yapay Zekâ",
+    "ROLE_SPECIFIC": "Rolünüz için Yapay Zekâ",
+    "TECHNICAL": "Teknik Yapay Zekâ"
   },
   "form": {
     "action": "İşlem",

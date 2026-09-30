@@ -644,16 +644,17 @@
     "ADVANCED": "Advanced"
   },
   "category": {
+    "COMMUNICATION": "Communication & Collaboration",
+    "DATA": "Data & Automation",
     "FOUNDATIONS": "AI Foundations",
     "GENERATIVE_AI": "Generative AI",
-    "PROMPTING": "Prompting",
-    "ROLE_SPECIFIC": "AI for your role",
-    "RESPONSIBLE_AI": "Responsible AI",
-    "DATA": "Data & Automation",
-    "TECHNICAL": "Technical AI",
-    "COMMUNICATION": "Communication & Collaboration",
+    "LANGUAGES": "Languages",
     "LEADERSHIP": "Leadership & Management",
-    "PRODUCTIVITY": "Productivity & Personal Effectiveness"
+    "PRODUCTIVITY": "Productivity & Personal Effectiveness",
+    "PROMPTING": "Prompting",
+    "RESPONSIBLE_AI": "Responsible AI",
+    "ROLE_SPECIFIC": "AI for your role",
+    "TECHNICAL": "Technical AI"
   },
   "form": {
     "action": "Action",
