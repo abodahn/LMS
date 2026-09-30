@@ -32,8 +32,16 @@ export async function register() {
    * Deliberately independent of the scheduler below. An instance running with
    * SCHEDULER=off — which is correct behind a load balancer — still has to end
    * up with a complete catalogue.
+   *
+   * **Opt-in, and deliberately so.** Running this automatically took the site
+   * down: importing ten thousand rows saturates a small instance, the health
+   * check times out, the host restarts the container, and the import begins
+   * again — a loop that serves nothing but keeps the disk busy. An import is a
+   * maintenance operation with a real cost, and a site staying up matters more
+   * than a catalogue completing unattended. Set LOAD_CATALOGUE=on when the
+   * instance can afford it, or run scripts/import-courses-csv.mts from a shell.
    */
-  if (process.env.NODE_ENV === "production" || process.env.LOAD_CATALOGUE === "on") {
+  if (process.env.LOAD_CATALOGUE === "on") {
     setTimeout(() => {
       void (async () => {
         try {
