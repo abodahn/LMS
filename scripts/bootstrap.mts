@@ -39,11 +39,30 @@ async function main() {
   // import is minutes long, and nothing before the port opens may take that
   // long — the app loads it in the background instead (src/lib/catalog-bootstrap.ts).
 
+  // Always, not only on a fresh database. Reference data is a vocabulary, and a
+  // vocabulary added after the first deploy has to reach an existing database
+  // too: the Languages category shipped later than production did, so every
+  // language course imported against a database that had never heard of it and
+  // was filed as uncategorised — invisible in a catalogue you browse by
+  // category. Upserts, so this costs nothing when there is nothing new.
+  await ensureCategories();
+
   // Always, not only on a fresh database: an instance deployed without these
   // variables has no administrator, and the operator's fix is to add them and
   // redeploy. That has to work.
   await ensureAdministrator();
   console.log("[bootstrap] done");
+}
+
+async function ensureCategories() {
+  const { CATEGORIES } = await import("../prisma/seed/courses");
+  let added = 0;
+  for (const c of CATEGORIES) {
+    const existing = await prisma.courseCategory.findUnique({ where: { key: c.key } });
+    if (!existing) added++;
+    await prisma.courseCategory.upsert({ where: { key: c.key }, update: c, create: c });
+  }
+  if (added > 0) console.log(`[bootstrap] ${added} new course category/categories`);
 }
 
 async function seedReferenceData() {

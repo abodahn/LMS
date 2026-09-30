@@ -41,6 +41,7 @@ export default async function CatalogPage({
   const skill = typeof params.skill === "string" ? params.skill : "";
   const role = typeof params.role === "string" ? params.role : "";
   const type = typeof params.type === "string" ? params.type : "";
+  const teaches = typeof params.teaches === "string" ? params.teaches : "";
   const page = Math.max(1, Number(params.page ?? 1) || 1);
 
   // Bands rather than a slider: nobody filters a catalogue by "between 3.5 and
@@ -91,6 +92,15 @@ export default async function CatalogPage({
             },
           ]
         : []),
+      // The language a course *teaches*, which is not the language it is
+      // taught in: Turkish for Arabic speakers is delivered in Arabic, so the
+      // language filter below cannot find it and the two are not interchangeable.
+      //
+      // ponytail: read off the description, which the language harvest writes
+      // as "Turkish · Beginner. …". A column of its own is the right home for
+      // this, and is worth a migration only once something other than the
+      // Languages category needs to know.
+      ...(teaches ? [{ description: { startsWith: `${teaches} · ` } }] : []),
       // Taught in the language, or subtitled into it — an Arabic speaker can
       // follow an English course with Arabic subtitles.
       ...(lang
@@ -178,6 +188,19 @@ export default async function CatalogPage({
             ],
           },
           {
+            // Sits beside Language deliberately: one is the language you need
+            // to understand the course, the other is the language you came to
+            // learn, and seeing them together is what makes the difference read.
+            name: "teaches",
+            label: t("common.teaches"),
+            value: teaches,
+            options: [
+              { value: "Turkish", label: "Türkçe" },
+              { value: "English", label: "English" },
+              { value: "Arabic", label: "العربية" },
+            ],
+          },
+          {
             name: "level",
             label: t("common.level"),
             value: level,
@@ -188,7 +211,7 @@ export default async function CatalogPage({
           },
           {
             name: "category",
-            label: t("common.filter"),
+            label: t("common.category"),
             value: category,
             options: categories.map((c) => ({
               value: c.id,

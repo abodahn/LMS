@@ -112,10 +112,17 @@ export async function ensureCatalogue(): Promise<{ imported: number; skipped: bo
       const { headers, rows } = parseCsv(readFileSync(path, "utf8"));
       const codes = rows.map((r) => r.Code).filter(Boolean);
 
-      const stored = await alreadyStored(codes);
-      if (stored >= codes.length) {
-        console.log(`[catalogue] ${path}: already loaded (${stored} courses)`);
-        continue;
+      // Only a large file is worth skipping. A small one costs a couple of
+      // seconds, and re-importing it is how its rows pick up reference data
+      // that arrived after they did: the language courses were imported before
+      // the Languages category existed, were filed as uncategorised, and could
+      // never fix themselves while "already stored" meant "leave alone".
+      if (rows.length > AUTO_IMPORT_LIMIT) {
+        const stored = await alreadyStored(codes);
+        if (stored >= codes.length) {
+          console.log(`[catalogue] ${path}: already loaded (${stored} courses)`);
+          continue;
+        }
       }
 
       const started = Date.now();

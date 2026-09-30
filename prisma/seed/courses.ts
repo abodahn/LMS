@@ -11,7 +11,7 @@ const PROVIDERS = [
   { key: "TC_ACADEMY", name: "T&C AI Academy", website: null, trustScore: 1 },
 ];
 
-const CATEGORIES = [
+export const CATEGORIES = [
   { key: "FOUNDATIONS", name: "AI Foundations", order: 1 },
   { key: "GENERATIVE_AI", name: "Generative AI", order: 2 },
   { key: "PROMPTING", name: "Prompting", order: 3 },
