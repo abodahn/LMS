@@ -35,10 +35,9 @@ async function main() {
     await seedReferenceData();
   }
 
-  // Not only on a fresh database. A deploy that came up with a short catalogue
-  // — because an earlier image did not ship the file — has to be repairable by
-  // redeploying, not by knowing which command to run in a shell.
-  await ensureCatalogue();
+  // The catalogue is deliberately not loaded here. At ten thousand rows the
+  // import is minutes long, and nothing before the port opens may take that
+  // long — the app loads it in the background instead (src/lib/catalog-bootstrap.ts).
 
   // Always, not only on a fresh database: an instance deployed without these
   // variables has no administrator, and the operator's fix is to add them and
@@ -79,63 +78,6 @@ async function seedReferenceData() {
   await step("learning paths", () => seedPaths(prisma));
   await step("prompt library and use cases", () => seedContent(prisma));
 
-}
-
-/**
- * Loads the harvested catalogue from the committed CSV.
- *
- * The seeds build 55 curated courses. The other 1,100 were produced by
- * harvesting YouTube and verifying platform links — slow, networked work that
- * has no business running on a production boot, so the reviewed result travels
- * with the repository instead (see scripts/export-catalog.mts).
- *
- * Importing also gives every YouTube course a playable lesson, so the
- * catalogue arrives usable rather than as a list of links.
- *
- * A missing or unreadable file is a warning, not a failure: 55 courses is a
- * working academy, and refusing to start over the other 1,100 would be the
- * wrong trade.
- */
-async function ensureCatalogue() {
-  const path = "data/catalog.csv";
-  const started = Date.now();
-
-  try {
-    const { readFileSync, existsSync } = await import("node:fs");
-    if (!existsSync(path)) {
-      console.warn(`[bootstrap] no ${path} in the image — catalogue stays at ${await prisma.course.count()} courses`);
-      return;
-    }
-
-    const { parseCsv } = await import("../src/lib/import/parse");
-    const { validateCourseRows, commitCourseImport } = await import("../src/lib/import/courses");
-
-    const { headers, rows } = parseCsv(readFileSync(path, "utf8"));
-
-    // Already loaded? The file's rows all carry YT- or PF- codes, so counting
-    // those tells us whether this instance has them without reading each row.
-    const loaded = await prisma.course.count({
-      where: { OR: [{ code: { startsWith: "YT-" } }, { code: { startsWith: "PF-" } }] },
-    });
-    if (loaded >= rows.length) {
-      console.log(`[bootstrap] catalogue complete (${loaded} imported courses)`);
-      return;
-    }
-
-    console.log(`[bootstrap] catalogue short: ${loaded} of ${rows.length} — importing`);
-    const preview = await validateCourseRows(headers, rows);
-
-    // trustLinks: every URL in this file was verified when it was harvested,
-    // which is a stronger check than an administrator ticking a box.
-    const result = await commitCourseImport(preview, { trustLinks: true });
-    console.log(
-      `[bootstrap] catalogue: +${result.created} new, ${result.updated} updated, ${result.lessons} playable lessons (${Date.now() - started}ms)`,
-    );
-  } catch (error) {
-    console.warn(
-      `[bootstrap] catalogue import failed, continuing with what is already there: ${error instanceof Error ? error.message : error}`,
-    );
-  }
 }
 
 /**
