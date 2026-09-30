@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
+import { getI18n } from "@/lib/locale";
+import { localized } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -41,9 +43,22 @@ export async function GET(request: NextRequest) {
     // Internal courses first: they are what an administrator assigns most, and
     // otherwise they drown under nine thousand external ones with similar names.
     orderBy: [{ isInternal: "desc" }, { title: "asc" }],
-    select: { id: true, title: true, estimatedHours: true, isInternal: true },
+    select: { id: true, title: true, titleAr: true, titleTr: true, estimatedHours: true, isInternal: true },
     take: 20,
   });
 
-  return NextResponse.json({ courses }, { headers: { "cache-control": "private, no-store" } });
+  // In the viewer's language, like every other course title they see — the
+  // chips a search adds sat beside localized ones otherwise.
+  const { locale } = await getI18n();
+  return NextResponse.json(
+    {
+      courses: courses.map((c) => ({
+        id: c.id,
+        title: localized(c, "title", locale),
+        estimatedHours: c.estimatedHours,
+        isInternal: c.isInternal,
+      })),
+    },
+    { headers: { "cache-control": "private, no-store" } },
+  );
 }

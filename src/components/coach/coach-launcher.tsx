@@ -9,6 +9,9 @@ import { cn } from "@/lib/utils";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+const MODES = ["FAST", "BALANCED", "DEEP", "TUTOR", "EXAM"] as const;
+type Mode = (typeof MODES)[number];
+
 /**
  * Deliberately a small floating affordance — it must never compete with the
  * lesson content for attention.
@@ -24,6 +27,9 @@ export function AiCoachLauncher({ enabled, lessonId }: { enabled: boolean; lesso
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Chosen per conversation; the default is the everyday one, so nobody has to
+  // understand modes to use the coach.
+  const [mode, setMode] = useState<Mode>("BALANCED");
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,11 +48,17 @@ export function AiCoachLauncher({ enabled, lessonId }: { enabled: boolean; lesso
       const res = await fetch("/api/coach", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: next, lessonId }),
+        body: JSON.stringify({ messages: next, lessonId, mode }),
       });
       const data = (await res.json()) as { reply?: string; error?: string };
       if (!res.ok || !data.reply) {
-        setError(data.error === "AI_DISABLED" ? t("coach.disabled") : t("coach.error"));
+        setError(
+          data.error === "AI_DISABLED"
+            ? t("coach.disabled")
+            : data.error === "AI_BUDGET"
+              ? t("coach.budget")
+              : t("coach.error"),
+        );
       } else {
         setMessages([...next, { role: "assistant", content: data.reply }]);
       }
@@ -82,6 +94,20 @@ export function AiCoachLauncher({ enabled, lessonId }: { enabled: boolean; lesso
           <header className="flex items-center gap-2 border-b border-[var(--brand-line)] px-4 py-3">
             <Sparkles size={16} className="text-[var(--brand-red)]" aria-hidden />
             <h2 className="text-sm font-semibold text-[var(--brand-ink)]">{t("coach.title")}</h2>
+            <label className="ms-auto flex items-center gap-1.5 text-[12px] text-[var(--brand-muted)]">
+              <span className="sr-only">{t("coach.mode")}</span>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.currentTarget.value as Mode)}
+                className="h-7 rounded-[var(--radius-control)] border border-[var(--brand-line)] bg-white px-1.5 text-[12px] text-[var(--brand-ink)]"
+              >
+                {MODES.map((m) => (
+                  <option key={m} value={m}>
+                    {t(`coach.modes.${m}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
           </header>
 
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">

@@ -270,3 +270,13 @@ html[dir="rtl"] :where(h1, h2, h3) {
     transition-duration: 0.001ms !important;
   }
 }
+
+/*
+  A field an AI assist filled in, until the page is saved and reloaded. Blue,
+  the colour the UI already uses for information, so it reads as "look at
+  this" rather than as an error.
+*/
+.field[data-ai-filled="true"] {
+  border-color: var(--brand-info);
+  background: color-mix(in srgb, var(--brand-info) 5%, var(--brand-surface));
+}

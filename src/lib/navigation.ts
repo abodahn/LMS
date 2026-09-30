@@ -60,6 +60,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/reports", labelKey: "admin.reports", icon: "file-spreadsheet", permission: "reports.export" },
   { href: "/admin/content", labelKey: "admin.content", icon: "lightbulb", permission: "content.manage" },
   { href: "/admin/opportunities", labelKey: "admin.opportunities", icon: "target", permission: "opportunities.manage" },
+  { href: "/admin/ai", labelKey: "admin.aiUsage", icon: "cpu", permission: "analytics.executive" },
   { href: "/admin/settings", labelKey: "admin.settings", icon: "settings", permission: "settings.manage" },
   { href: "/admin/audit", labelKey: "admin.audit", icon: "scroll-text", permission: "audit.view" },
 ];

@@ -22,12 +22,16 @@ export function CoursePicker({
   name,
   required,
   exclude = [],
+  onChoose,
   id: givenId,
   "aria-describedby": describedBy,
 }: {
-  name: string;
+  /** The field submitted with the chosen id. Omitted when `onChoose` handles the choice. */
+  name?: string;
   required?: boolean;
   exclude?: string[];
+  /** Hand each choice to the caller and clear the box, instead of holding one value. */
+  onChoose?: (course: { id: string; title: string }) => void;
   id?: string;
   "aria-describedby"?: string;
 }) {
@@ -76,10 +80,15 @@ export function CoursePicker({
   const visible = query.trim().length >= 2 ? hits : [];
 
   const choose = (hit: Hit) => {
-    setPicked(hit);
-    setQuery(hit.title);
     setOpen(false);
     setActive(-1);
+    if (onChoose) {
+      onChoose({ id: hit.id, title: hit.title });
+      setQuery("");
+      return;
+    }
+    setPicked(hit);
+    setQuery(hit.title);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -90,11 +99,13 @@ export function CoursePicker({
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive((i) => Math.max(0, i - 1));
-    } else if (e.key === "Enter" && open && active >= 0 && visible[active]) {
-      // Enter picks rather than submits while the list is open — submitting a
-      // half-typed name is never what somebody pressing Enter in a list meant.
+    } else if (e.key === "Enter" && query.trim().length >= 2) {
+      // Enter in a search box never submits the form around it. The picker
+      // now sits inside the course form, where an implicit submit would save
+      // the whole course because somebody pressed Enter on a half-typed name.
       e.preventDefault();
-      choose(visible[active]);
+      const target = visible[active >= 0 ? active : 0];
+      if (target) choose(target);
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -123,7 +134,7 @@ export function CoursePicker({
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         onKeyDown={onKeyDown}
       />
-      <input type="hidden" name={name} value={picked?.id ?? ""} />
+      {name ? <input type="hidden" name={name} value={picked?.id ?? ""} /> : null}
       {required ? (
         <input
           tabIndex={-1}
@@ -168,6 +179,60 @@ export function CoursePicker({
           )}
         </ul>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Several courses, chosen by search.
+ *
+ * Replaces a checkbox per course in the catalogue — ten thousand of them on
+ * every course form, to pick the two or three prerequisites a course has. Each
+ * chosen course submits as its own `name` field, exactly as the checkboxes
+ * did, so the action that reads them did not have to change.
+ */
+export function CourseMultiPicker({
+  name,
+  initial,
+  exclude = [],
+  id,
+}: {
+  name: string;
+  initial: { id: string; title: string }[];
+  exclude?: string[];
+  id?: string;
+}) {
+  const t = useT();
+  const [chosen, setChosen] = useState(initial);
+
+  return (
+    <div className="space-y-2">
+      {chosen.length > 0 ? (
+        <ul className="flex flex-wrap gap-2">
+          {chosen.map((c) => (
+            <li
+              key={c.id}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-[var(--radius-pill)] border border-[var(--brand-line)] bg-[var(--brand-canvas)] py-1 ps-3 pe-1 text-[12px] text-[var(--brand-ink)]"
+            >
+              <input type="hidden" name={name} value={c.id} />
+              <span className="truncate">{c.title}</span>
+              <button
+                type="button"
+                onClick={() => setChosen((list) => list.filter((x) => x.id !== c.id))}
+                aria-label={`${t("common.remove")}: ${c.title}`}
+                className="rounded-full px-1.5 text-[var(--brand-muted)] hover:bg-[var(--brand-line)] hover:text-[var(--brand-ink)]"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <CoursePicker
+        id={id}
+        exclude={[...exclude, ...chosen.map((c) => c.id)]}
+        onChoose={(c) => setChosen((list) => (list.some((x) => x.id === c.id) ? list : [...list, c]))}
+      />
     </div>
   );
 }

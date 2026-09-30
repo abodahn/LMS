@@ -66,7 +66,7 @@ export function IntegrationsForm({
             <Field label={t("form.baseUrl")} hint={t("form.baseUrlHint")}>
               {(p) => <TextInput {...p} name="baseUrl" type="url" defaultValue={ai.baseUrl} />}
             </Field>
-            <Field label={t("form.maxTokens")} required>
+            <Field label={t("form.maxTokens")} hint={t("ai.maxTokensHint")} required>
               {(p) => (
                 <TextInput {...p} name="maxTokens" type="number" min={128} max={8192} required defaultValue={ai.maxTokens} />
               )}

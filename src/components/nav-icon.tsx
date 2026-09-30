@@ -7,6 +7,7 @@ import {
   Building2,
   ClipboardCheck,
   ClipboardList,
+  Cpu,
   FileSpreadsheet,
   GraduationCap,
   Home,
@@ -52,6 +53,7 @@ const ICONS = {
   "scroll-text": ScrollText,
   calendar: Calendar,
   "calendar-days": CalendarDays,
+  cpu: Cpu,
 } as const;
 
 export type IconName = keyof typeof ICONS;

@@ -97,6 +97,7 @@ model User {
   goalsApproved       DevelopmentGoal[]         @relation("GoalApprover")
   recurringCreated    RecurringAssignment[]     @relation("RecurringAuthor")
   signOffsGiven       PracticalSignOff[]        @relation("SignOffSupervisor")
+  aiUsage             AiUsage[]                 @relation("AiUser")
 
   @@index([departmentId])
   @@index([managerId])
@@ -537,6 +538,9 @@ model Course {
   /// Completion needs a supervisor to confirm they watched it done. A video
   /// playing to the end is not evidence that a machine can be set up.
   requiresSignOff      Boolean   @default(false)
+  /// Drafted by the AI course builder. Stays true after editing and publishing,
+  /// so anyone can always see which courses started life as a machine draft.
+  aiGenerated          Boolean   @default(false)
   isRecommended        Boolean   @default(false)
   isTechnical          Boolean   @default(false)
   youtubePlaylistId    String?
@@ -1404,6 +1408,63 @@ model PracticalSignOff {
   signedBy   User       @relation("SignOffSupervisor", fields: [signedById], references: [id], onDelete: Cascade)
 
   @@index([signedById])
+}
+
+// ---------------------------------------------------------------------------
+// AI cost control
+// ---------------------------------------------------------------------------
+
+/**
+ * One AI call, metered. Written for every call, failed ones included, because a
+ * provider bills for a request that errored halfway just the same.
+ *
+ * Department is copied at call time rather than joined through the user: an
+ * employee who moves department takes their history with them otherwise, and
+ * last quarter's spend lands on a team that did not incur it.
+ */
+model AiUsage {
+  id           String   @id @default(cuid())
+  userId       String?
+  departmentId String?
+  /// COACH | EXPLAIN | COURSE_BUILDER | QUIZ | SUMMARY | TRANSLATE
+  feature      String
+  /// FAST | REASONING | LOW_COST | TRANSLATION | FALLBACK
+  role         String
+  provider     String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  ok           Boolean  @default(true)
+  /// A short code, never the provider's response body.
+  errorCode    String?
+  createdAt    DateTime @default(now())
+
+  user User? @relation("AiUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([departmentId, createdAt])
+  @@index([userId, createdAt])
+}
+
+/**
+ * A monthly token allowance for the company or one department.
+ *
+ * Tokens rather than money: a token count is exact, while a cost depends on a
+ * price somebody typed in and may never have typed in at all. Spend is shown in
+ * money wherever prices exist; the limit is held in the unit that cannot drift.
+ */
+model AiBudget {
+  id            String   @id @default(cuid())
+  /// "COMPANY", or "DEPT:" followed by a department id.
+  key           String   @unique
+  departmentId  String?
+  monthlyTokens Int
+  /// At the limit, refuse further calls rather than only warn.
+  hardStop      Boolean  @default(false)
+  /// The month ("2026-09") an alert was last sent, so each fires once a month.
+  alerted80     String?
+  alerted100    String?
+  updatedAt     DateTime @updatedAt
 }
 
 // ---------------------------------------------------------------------------

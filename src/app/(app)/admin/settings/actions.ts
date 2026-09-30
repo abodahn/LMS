@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { parseJson } from "@/lib/utils";
 import { requirePermission } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { getSettings, setSetting } from "@/lib/settings";
@@ -80,7 +81,17 @@ export async function saveAiIntegrationAction(_prev: SettingsState, formData: Fo
   if (!parsed.success) return { error: "errors.validation" };
   const d = parsed.data;
 
-  const config = { provider: d.provider, model: d.model, baseUrl: d.baseUrl || undefined, maxTokens: d.maxTokens };
+  // Merged into what is there, never replaced: the model roles and prices set
+  // on /admin/ai live on the same row, and saving this form used to wipe them —
+  // routing every task to the default model and every cost to "unknown".
+  const current = await prisma.integration.findUnique({ where: { key: "ai" } });
+  const config = {
+    ...parseJson<Record<string, unknown>>(current?.config ?? null, {}),
+    provider: d.provider,
+    model: d.model,
+    baseUrl: d.baseUrl || undefined,
+    maxTokens: d.maxTokens,
+  };
   await prisma.integration.upsert({
     where: { key: "ai" },
     update: { config: JSON.stringify(config), enabled: !!d.enabled },

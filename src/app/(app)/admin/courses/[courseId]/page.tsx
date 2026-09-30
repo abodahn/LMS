@@ -6,14 +6,16 @@ import { requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/locale";
 import { STRIKES_BEFORE_WITHDRAWAL } from "@/lib/links";
-import { translate } from "@/lib/i18n";
+import { localized, translate } from "@/lib/i18n";
 import { formatDate, parseJson } from "@/lib/utils";
-import { Alert, Card, SectionHeading, StatCard, StatusPill } from "@/components/ui/primitives";
+import { Alert, Badge, Card, SectionHeading, StatCard, StatusPill } from "@/components/ui/primitives";
 import { CourseForm } from "../course-form";
 import { loadCourseFormOptions } from "../course-data";
 import { StructureBuilder } from "../structure-builder";
 import { VerificationForm } from "../verification-form";
 import { ScormPanel } from "../scorm-panel";
+import { QuizDraftForm } from "../ai-tools";
+import { aiAvailable } from "@/lib/ai/provider";
 
 export const metadata: Metadata = { title: "Edit course" };
 
@@ -23,7 +25,7 @@ export default async function EditCoursePage({ params }: PageProps<"/admin/cours
   const { dict, locale } = await getI18n();
   const t = (k: string) => translate(dict, k);
 
-  const [course, options] = await Promise.all([
+  const [course, options, aiEnabled] = await Promise.all([
     prisma.course.findUnique({
       where: { id: courseId },
       include: {
@@ -31,7 +33,7 @@ export default async function EditCoursePage({ params }: PageProps<"/admin/cours
         departments: true,
         jobFamilies: true,
         goals: true,
-        prerequisites: true,
+        prerequisites: { include: { prerequisite: { select: { id: true, title: true, titleAr: true, titleTr: true } } } },
         languages: true,
         modules: {
           include: { lessons: { orderBy: { order: "asc" }, include: { scorm: true } } },
@@ -43,6 +45,7 @@ export default async function EditCoursePage({ params }: PageProps<"/admin/cours
       },
     }),
     loadCourseFormOptions(locale),
+    aiAvailable(),
   ]);
   if (!course) notFound();
 
@@ -64,8 +67,21 @@ export default async function EditCoursePage({ params }: PageProps<"/admin/cours
       <SectionHeading
         title={course.title}
         subtitle={`${course.code} · ${course.platform}`}
-        action={<StatusPill status={course.status} />}
+        action={
+          <span className="flex items-center gap-2">
+            {course.aiGenerated ? <Badge tone="info">{t("ai.generatedBadge")}</Badge> : null}
+            <StatusPill status={course.status} />
+          </span>
+        }
       />
+
+      {course.aiGenerated && course.status !== "PUBLISHED" ? (
+        // Kept on screen until the course is published, not just on the first
+        // visit: the review it asks for is the whole safeguard.
+        <Alert tone="info" title={t("ai.reviewTitle")}>
+          {t("ai.reviewBody")}
+        </Alert>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label={t("common.employees")} value={course._count.enrollments} />
@@ -134,6 +150,11 @@ export default async function EditCoursePage({ params }: PageProps<"/admin/cours
           subtitles: course.languages.filter((l) => l.isSubtitle).map((l) => l.language),
         }}
         {...options}
+        aiEnabled={aiEnabled && admin.permissions.includes("catalog.manage")}
+        prerequisites={course.prerequisites.map((p) => ({
+          id: p.prerequisite.id,
+          title: localized(p.prerequisite, "title", locale),
+        }))}
       />
 
       <ScormPanel
@@ -175,6 +196,10 @@ export default async function EditCoursePage({ params }: PageProps<"/admin/cours
           })),
         }))}
       />
+
+      {aiEnabled && admin.permissions.includes("assessments.manage") && course.modules.length > 0 ? (
+        <QuizDraftForm courseId={course.id} />
+      ) : null}
 
       {admin.permissions.includes("catalog.verify") ? <VerificationForm courseId={course.id} /> : null}
 

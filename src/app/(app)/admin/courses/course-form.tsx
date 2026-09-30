@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Alert, Card } from "@/components/ui/primitives";
 import { Checkbox, Field, FormError, FormSuccess, Select, TextArea, TextInput } from "@/components/ui/form";
 import { useMessage, useT } from "@/components/i18n-provider";
+import { CourseMultiPicker } from "@/components/course-picker";
+import { AiAssist } from "./ai-tools";
 import { DIFFICULTIES, JOB_FAMILIES, LEARNING_GOALS, LOCALES } from "@/lib/constants";
 import { humanizeKey } from "@/lib/utils";
 import { saveCourseAction, type CourseState } from "./actions";
@@ -69,7 +71,8 @@ export function CourseForm({
   levels,
   competencies,
   departments,
-  courses,
+  prerequisites,
+  aiEnabled = false,
 }: {
   values: CourseFormValues;
   providers: Option[];
@@ -77,7 +80,10 @@ export function CourseForm({
   levels: (Option & { code: string })[];
   competencies: Option[];
   departments: Option[];
-  courses: Option[];
+  /** The prerequisites already set, with titles for their chips. */
+  prerequisites: { id: string; title: string }[];
+  /** AI is configured and this person may edit courses. */
+  aiEnabled?: boolean;
 }) {
   const t = useT();
   const msg = useMessage();
@@ -136,6 +142,12 @@ export function CourseForm({
           <Field label={t("form.learningOutcomes")} hint={t("form.onePerLine")} className="sm:col-span-2">
             {(p) => <TextArea {...p} name="outcomes" rows={4} defaultValue={values.outcomes} />}
           </Field>
+
+          {aiEnabled ? (
+            <div className="sm:col-span-2">
+              <AiAssist />
+            </div>
+          ) : null}
         </div>
       </Card>
 
@@ -434,19 +446,11 @@ export function CourseForm({
 
         <fieldset className="mt-5">
           <legend className="label">{t("form.prerequisites")}</legend>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {courses
-              .filter((c) => c.id !== values.id)
-              .map((c) => (
-                <Checkbox
-                  key={c.id}
-                  name="prerequisites"
-                  value={c.id}
-                  defaultChecked={values.prerequisites.includes(c.id)}
-                  label={c.name}
-                />
-              ))}
-          </div>
+          <CourseMultiPicker
+            name="prerequisites"
+            initial={prerequisites}
+            exclude={values.id ? [values.id] : []}
+          />
         </fieldset>
       </Card>
 

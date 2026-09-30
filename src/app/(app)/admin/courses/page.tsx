@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Download, Plus, TriangleAlert, Upload } from "lucide-react";
+import { Download, Plus, Sparkles, TriangleAlert, Upload } from "lucide-react";
 import { requirePermission } from "@/lib/auth";
+import { aiAvailable } from "@/lib/ai/provider";
 import { prisma } from "@/lib/db";
 import { needsCourseReview } from "@/lib/analytics";
 import { getI18n } from "@/lib/locale";
@@ -18,7 +19,8 @@ export const metadata: Metadata = { title: "Course catalog" };
 const PAGE_SIZE = 25;
 
 export default async function AdminCoursesPage({ searchParams }: PageProps<"/admin/courses">) {
-  await requirePermission("catalog.view");
+  const admin = await requirePermission("catalog.view");
+  const aiEnabled = await aiAvailable();
   const { dict, locale } = await getI18n();
   const t = (k: string) => translate(dict, k);
   const params = await searchParams;
@@ -90,6 +92,12 @@ export default async function AdminCoursesPage({ searchParams }: PageProps<"/adm
               <Download size={15} />
               {t("common.exportExcel")}
             </DownloadLink>
+            {aiEnabled && admin.permissions.includes("catalog.manage") ? (
+              <LinkButton href="/admin/courses/ai" variant="secondary" size="sm">
+                <Sparkles size={15} />
+                {t("ai.draftCourse")}
+              </LinkButton>
+            ) : null}
             <LinkButton href="/admin/courses/new" size="sm">
               <Plus size={15} />
               {t("common.create")}

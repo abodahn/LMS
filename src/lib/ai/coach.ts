@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "../db";
-import { chat, type ChatMessage } from "./provider";
+import { chat, type ChatMessage, type ModelRole } from "./provider";
 import type { SessionUser } from "../auth";
 
 /**
@@ -61,9 +61,61 @@ How to answer:
 - Never give a score, grade, level, or certificate decision — those come from the platform, not from you.`;
 }
 
-export async function askCoach(user: SessionUser, messages: ChatMessage[], lessonId?: string | null) {
-  const system = await coachSystemPrompt(user, lessonId);
-  return chat(system, messages.slice(-10));
+/**
+ * How the coach answers. Each mode is a model role and an instruction, nothing
+ * more: the facts the coach may use, and what it must refuse, are the same in
+ * every mode.
+ *
+ * "Tutor" answers with questions, because working it out is what makes it
+ * stick. "Exam" practises with questions and explains the answers, but never
+ * grades — a score from the coach would look official and would not be.
+ */
+export const COACH_MODES = ["FAST", "BALANCED", "DEEP", "TUTOR", "EXAM"] as const;
+export type CoachMode = (typeof COACH_MODES)[number];
+
+const MODE: Record<CoachMode, { role: ModelRole; maxTokens: number; instruction: string }> = {
+  FAST: {
+    role: "FAST",
+    maxTokens: 400,
+    instruction: "Answer in at most three short sentences. No lists unless asked.",
+  },
+  BALANCED: { role: "FAST", maxTokens: 800, instruction: "" },
+  DEEP: {
+    role: "REASONING",
+    maxTokens: 1600,
+    instruction:
+      "Give a thorough explanation: the idea, why it works, one worked example from their department, and the common mistake. Up to 450 words.",
+  },
+  TUTOR: {
+    role: "FAST",
+    maxTokens: 600,
+    instruction:
+      "Do not give the answer straight away. Ask one guiding question at a time that leads them to work it out, and confirm when they get there.",
+  },
+  EXAM: {
+    role: "FAST",
+    maxTokens: 800,
+    instruction:
+      "Help them practise: ask one question at a time about what they are studying, wait for their answer, then explain what was right and what was missing. Never give a score, a pass or a fail.",
+  },
+};
+
+export async function askCoach(
+  user: SessionUser,
+  messages: ChatMessage[],
+  lessonId?: string | null,
+  mode: CoachMode = "BALANCED",
+) {
+  const m = MODE[mode];
+  const base = await coachSystemPrompt(user, lessonId);
+  const system = m.instruction ? `${base}\n\nMode for this conversation:\n- ${m.instruction}` : base;
+  return chat(system, messages.slice(-10), {
+    feature: "COACH",
+    role: m.role,
+    userId: user.id,
+    maxTokens: m.maxTokens,
+    acceptTruncated: true,
+  });
 }
 
 /** Optional plain-language wrapper around an already-computed recommendation. */
@@ -92,5 +144,5 @@ Maximum 70 words. No bullet points. No greeting. Second person ("you").`;
     `Courses: ${input.courses.map((c) => `${c.title} (${c.hours}h — ${c.reasons.join("; ")})`).join(" | ")}`,
   ].join("\n");
 
-  return chat(system, [{ role: "user", content: payload }]);
+  return chat(system, [{ role: "user", content: payload }], { feature: "EXPLAIN", role: "LOW_COST", acceptTruncated: true });
 }
