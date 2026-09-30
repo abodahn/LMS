@@ -30,10 +30,16 @@ export async function issueCourseCertificate(userId: string, enrollmentId: strin
   if (enrollment.status !== "COMPLETED") return null;
   if (!enrollment.course.isInternal) return null;
 
+  // Reused only when it already covers this completion. Recurring training
+  // completes the same course again a year later, and handing back last year's
+  // certificate would leave the renewal with no proof of its own — the one date
+  // an auditor asks about would be the old one. Earlier certificates are kept:
+  // they are the history.
   const existing = await prisma.certificate.findFirst({
     where: { userId, courseId: enrollment.courseId, type: "COURSE", status: "VALID" },
+    orderBy: { issuedAt: "desc" },
   });
-  if (existing) return existing;
+  if (existing && (!enrollment.completedAt || existing.issuedAt >= enrollment.completedAt)) return existing;
 
   const certificate = await prisma.certificate.create({
     data: {

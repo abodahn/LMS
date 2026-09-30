@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
 import { FormError, FormSuccess, Select, TextInput } from "@/components/ui/form";
@@ -16,19 +17,39 @@ const LEVELS = [0, 1, 2, 3, 4, 5];
  * Saving on change rather than behind a Save button: a manager going down a
  * list of fifteen skills will not press Save fifteen times, and a form that
  * silently loses most of what was entered is worse than no form.
+ *
+ * Because it saves on change, a failed save has to undo the change on screen —
+ * otherwise the select shows a level that was never stored and the rating
+ * looks saved. Each attempt is counted, and a failure remounts the select on
+ * the stored level; the reason is shown and announced beside it.
  */
-export function RateControl({ userId, skillId, level }: { userId: string; skillId: string; level: number }) {
+export function RateControl({
+  userId,
+  skillId,
+  skillName,
+  level,
+}: {
+  userId: string;
+  skillId: string;
+  skillName: string;
+  level: number;
+}) {
   const t = useT();
-  const [state, submit] = useActionState<TeamState, FormData>(rateSkillAction, {});
+  const msg = useMessage();
+  const [state, submit] = useActionState<TeamState & { attempt: number }, FormData>(
+    async (prev, form) => ({ ...(await rateSkillAction(prev, form)), attempt: prev.attempt + 1 }),
+    { attempt: 0 },
+  );
 
   return (
     <form action={submit} className="flex items-center gap-1.5">
       <input type="hidden" name="userId" value={userId} />
       <input type="hidden" name="skillId" value={skillId} />
       <Select
+        key={state.error ? `${level}:${state.attempt}` : String(level)}
         name="level"
         defaultValue={String(level)}
-        aria-label={t("skills.rate")}
+        aria-label={`${t("skills.rate")}: ${skillName}`}
         className="h-8 w-[136px] text-[12px]"
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
       >
@@ -38,8 +59,24 @@ export function RateControl({ userId, skillId, level }: { userId: string; skillI
           </option>
         ))}
       </Select>
-      {state.error ? <span className="text-[11px] text-[var(--brand-red)]">!</span> : null}
+      {state.error ? (
+        <span role="status" className="max-w-[180px] text-[11px] text-[var(--brand-red)]">
+          {msg(state.error)}
+        </span>
+      ) : null}
     </form>
+  );
+}
+
+/** "0 → 3" with an arrow that points the right way in Arabic too. */
+export function LevelRange({ from, to }: { from: number; to: number }) {
+  const t = useT();
+  return (
+    <span aria-label={t("skills.levelRange", { from, to })} className="inline-flex items-center gap-1 tabular-nums">
+      <span aria-hidden>{from}</span>
+      <ArrowRight size={12} className="rtl:rotate-180" aria-hidden />
+      <span aria-hidden>{to}</span>
+    </span>
   );
 }
 
@@ -103,7 +140,7 @@ export function PlanPanel({
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="text-[13px] font-medium text-[var(--brand-ink)]">{g.skillName}</span>
                 <span className="text-[12px] text-[var(--brand-muted)]">
-                  {g.fromLevel} → {g.targetLevel} · {t(`skills.${g.status.toLowerCase()}`)}
+                  <LevelRange from={g.fromLevel} to={g.targetLevel} /> · {t(`skills.${g.status.toLowerCase()}`)}
                 </span>
               </div>
 

@@ -32,6 +32,9 @@ model User {
   lockedUntil        DateTime?
   lastLoginAt        DateTime?
   preferredLanguage  String    @default("en") // en | ar | tr
+  /// A | B | C for a rotating factory, or DAY | NIGHT. Free text because the
+  /// naming differs per site and a wrong enum is worse than a string.
+  shift              String?
   departmentId       String?
   sectionId          String?
   jobTitleId         String?
@@ -92,6 +95,8 @@ model User {
   developmentGoals    DevelopmentGoal[]         @relation("GoalOwner")
   goalsRaised         DevelopmentGoal[]         @relation("GoalAuthor")
   goalsApproved       DevelopmentGoal[]         @relation("GoalApprover")
+  recurringCreated    RecurringAssignment[]     @relation("RecurringAuthor")
+  signOffsGiven       PracticalSignOff[]        @relation("SignOffSupervisor")
 
   @@index([departmentId])
   @@index([managerId])
@@ -529,6 +534,9 @@ model Course {
   status               String    @default("PUBLISHED") // DRAFT | PUBLISHED | ARCHIVED
   isInternal           Boolean   @default(false)
   isMandatory          Boolean   @default(false)
+  /// Completion needs a supervisor to confirm they watched it done. A video
+  /// playing to the end is not evidence that a machine can be set up.
+  requiresSignOff      Boolean   @default(false)
   isRecommended        Boolean   @default(false)
   isTechnical          Boolean   @default(false)
   youtubePlaylistId    String?
@@ -559,6 +567,7 @@ model Course {
   requiredBy      CoursePrerequisite[]   @relation("PrerequisiteSide")
   competencies    CourseCompetency[]
   skills          CourseSkill[]
+  recurrences     RecurringAssignment[]
   departments     CourseDepartment[]
   jobFamilies     CourseJobFamily[]
   goals           CourseGoal[]
@@ -859,6 +868,7 @@ model Enrollment {
   path       LearningPath? @relation(fields: [pathId], references: [id], onDelete: SetNull)
 
   lessonProgress LessonProgress[]
+  signOff        PracticalSignOff?
   proofs         ExternalCompletionProof[]
   feedback       CourseFeedback?
   scormStates    ScormState[]
@@ -1333,6 +1343,67 @@ model DevelopmentGoal {
 
   @@unique([userId, skillId])
   @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Recurring and observed learning
+// ---------------------------------------------------------------------------
+
+/**
+ * Training that has to be done again, not just once.
+ *
+ * Safety and compliance courses expire; a certificate from three years ago
+ * proves nothing about today. The scheduler re-assigns against this rather than
+ * anyone keeping a spreadsheet of who is overdue.
+ */
+model RecurringAssignment {
+  id           String  @id @default(cuid())
+  courseId     String
+  /// EVERYONE | DEPARTMENT | JOB_FAMILY | JOB_TITLE | LOCATION | SHIFT
+  audience     String  @default("EVERYONE")
+  /// The id or code the audience selects on. Null when audience is EVERYONE.
+  audienceValue String?
+  /// How often it comes round again.
+  everyMonths  Int     @default(12)
+  /// Days allowed to complete each time it is assigned.
+  dueDays      Int     @default(30)
+  /// ASSIGNED | MANDATORY
+  source       String  @default("MANDATORY")
+  isActive     Boolean @default(true)
+  lastRunAt    DateTime?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation("RecurringAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([isActive])
+}
+
+/**
+ * A supervisor confirming they watched someone do it.
+ *
+ * A machine-setup course is not finished because a video played to the end. For
+ * a course that requires it, the enrolment stays open until this row exists —
+ * which is the difference between recorded training and demonstrated competence.
+ */
+model PracticalSignOff {
+  id           String   @id @default(cuid())
+  enrollmentId String   @unique
+  signedById   String
+  /// What was observed. Required: a sign-off with no observation behind it is
+  /// a signature, not a judgement.
+  observation  String
+  /// Optionally records the skill level this demonstrated.
+  skillId      String?
+  skillLevel   Int?
+  signedAt     DateTime @default(now())
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  signedBy   User       @relation("SignOffSupervisor", fields: [signedById], references: [id], onDelete: Cascade)
+
+  @@index([signedById])
 }
 
 // ---------------------------------------------------------------------------

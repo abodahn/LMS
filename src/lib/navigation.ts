@@ -35,6 +35,7 @@ export const EXPLORE_NAV: NavItem[] = [
   // HR portal, and a skills matrix is something you open when a manager asks
   // you to, not daily.
   { href: "/skills", labelKey: "nav.skills", icon: "target" },
+  { href: "/calendar", labelKey: "nav.calendar", icon: "calendar" },
   { href: "/passport", labelKey: "nav.passport", icon: "id-card" },
 ];
 

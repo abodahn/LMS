@@ -2,6 +2,8 @@ import {
   Award,
   BarChart3,
   Briefcase,
+  Calendar,
+  CalendarDays,
   Building2,
   ClipboardCheck,
   ClipboardList,
@@ -48,10 +50,19 @@ const ICONS = {
   "file-spreadsheet": FileSpreadsheet,
   target: Target,
   "scroll-text": ScrollText,
+  calendar: Calendar,
+  "calendar-days": CalendarDays,
 } as const;
 
 export type IconName = keyof typeof ICONS;
+export const ICON_NAMES: string[] = Object.keys(ICONS);
 
+/**
+ * The fallback is Home rather than nothing so a typo never leaves a hole in the
+ * menu — which is also why a missing name goes unnoticed. `navIconsResolve` in
+ * the tests checks every nav entry against this map for exactly that reason:
+ * "calendar-days" shipped without an entry and showed a house for weeks.
+ */
 export function NavIcon({ name, size = 18 }: { name: string; size?: number }) {
   const Cmp = ICONS[name as IconName] ?? Home;
   return <Cmp size={size} aria-hidden strokeWidth={1.9} />;

@@ -386,56 +386,67 @@ export async function commitCourseImport(preview: CourseImportPreview, options: 
       stillAvailable: true,
     };
 
-    const existing = await prisma.course.findUnique({ where: { code: d.code } });
-    const course = existing
-      ? await prisma.course.update({ where: { code: d.code }, data })
-      : await prisma.course.create({ data: { code: d.code, ...data } });
-    if (existing) updated++;
-    else created++;
+    // One transaction per row. The catalogue loader runs this in a child
+    // process that can be killed for memory at any statement, and --new-only
+    // never revisits a code that already exists — so a kill between the course
+    // and its relations used to leave a course with no competencies or
+    // language rows, permanently. Now a row lands whole or not at all.
+    const { course, isNew } = await prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.course.findUnique({ where: { code: d.code } });
+        const course = existing
+          ? await tx.course.update({ where: { code: d.code }, data })
+          : await tx.course.create({ data: { code: d.code, ...data } });
 
-    const weighted = parseWeighted(d.competencies);
-    const comp = matchEnum(weighted.map((w) => w.key), COMPETENCY_KEYS).ok;
-    await prisma.courseCompetency.deleteMany({ where: { courseId: course.id } });
-    for (const key of comp) {
-      const competency = await prisma.competency.findUnique({ where: { key } });
-      if (competency) {
-        await prisma.courseCompetency.create({
-          data: {
-            courseId: course.id,
-            competencyId: competency.id,
-            // The weight the file asked for, not a fixed 3.
-            weight: weighted.find((w) => norm(w.key) === norm(key))?.weight ?? 3,
-          },
-        });
-      }
-    }
+        const weighted = parseWeighted(d.competencies);
+        const comp = matchEnum(weighted.map((w) => w.key), COMPETENCY_KEYS).ok;
+        await tx.courseCompetency.deleteMany({ where: { courseId: course.id } });
+        for (const key of comp) {
+          const competency = await tx.competency.findUnique({ where: { key } });
+          if (competency) {
+            await tx.courseCompetency.create({
+              data: {
+                courseId: course.id,
+                competencyId: competency.id,
+                // The weight the file asked for, not a fixed 3.
+                weight: weighted.find((w) => norm(w.key) === norm(key))?.weight ?? 3,
+              },
+            });
+          }
+        }
 
-    await prisma.courseDepartment.deleteMany({ where: { courseId: course.id } });
-    for (const name of list(d.departments)) {
-      const dept = departments.find((x) => norm(x.code) === norm(name) || norm(x.name) === norm(name));
-      if (dept) {
-        await prisma.courseDepartment.create({ data: { courseId: course.id, departmentId: dept.id, weight: 2 } });
-      }
-    }
+        await tx.courseDepartment.deleteMany({ where: { courseId: course.id } });
+        for (const name of list(d.departments)) {
+          const dept = departments.find((x) => norm(x.code) === norm(name) || norm(x.name) === norm(name));
+          if (dept) {
+            await tx.courseDepartment.create({ data: { courseId: course.id, departmentId: dept.id, weight: 2 } });
+          }
+        }
 
-    await prisma.courseJobFamily.deleteMany({ where: { courseId: course.id } });
-    for (const jobFamily of matchEnum(list(d.jobFamilies), JOB_FAMILIES).ok) {
-      await prisma.courseJobFamily.create({ data: { courseId: course.id, jobFamily, weight: 2 } });
-    }
+        await tx.courseJobFamily.deleteMany({ where: { courseId: course.id } });
+        for (const jobFamily of matchEnum(list(d.jobFamilies), JOB_FAMILIES).ok) {
+          await tx.courseJobFamily.create({ data: { courseId: course.id, jobFamily, weight: 2 } });
+        }
 
-    await prisma.courseGoal.deleteMany({ where: { courseId: course.id } });
-    for (const goalKey of matchEnum(list(d.goals), LEARNING_GOALS).ok) {
-      await prisma.courseGoal.create({ data: { courseId: course.id, goalKey, weight: 2 } });
-    }
+        await tx.courseGoal.deleteMany({ where: { courseId: course.id } });
+        for (const goalKey of matchEnum(list(d.goals), LEARNING_GOALS).ok) {
+          await tx.courseGoal.create({ data: { courseId: course.id, goalKey, weight: 2 } });
+        }
 
-    await prisma.courseLanguage.deleteMany({ where: { courseId: course.id } });
-    await prisma.courseLanguage.create({ data: { courseId: course.id, language, isSubtitle: false } });
-    for (const sub of list(d.subtitles)) {
-      const code = LOCALES.find((l) => l === sub.toLowerCase());
-      if (code && code !== language) {
-        await prisma.courseLanguage.create({ data: { courseId: course.id, language: code, isSubtitle: true } });
-      }
-    }
+        await tx.courseLanguage.deleteMany({ where: { courseId: course.id } });
+        await tx.courseLanguage.create({ data: { courseId: course.id, language, isSubtitle: false } });
+        for (const sub of list(d.subtitles)) {
+          const code = LOCALES.find((l) => l === sub.toLowerCase());
+          if (code && code !== language) {
+            await tx.courseLanguage.create({ data: { courseId: course.id, language: code, isSubtitle: true } });
+          }
+        }
+        return { course, isNew: !existing };
+      },
+      { timeout: 30_000 },
+    );
+    if (isNew) created++;
+    else updated++;
 
     // A YouTube course can play here rather than sending the learner away and
     // asking for a screenshot back. Skips anything that already has modules,

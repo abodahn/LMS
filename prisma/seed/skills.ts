@@ -420,6 +420,17 @@ export async function seedSkills(prisma: Db) {
       ...(BY_TITLE[job.name] ?? {}),
     };
 
+    // Requirements are derived from the title's family and flags, which an
+    // administrator can change in /admin/org. Anything the current derivation
+    // no longer produces is removed, or a title moved from Production to Quality
+    // would carry line balancing as a requirement for good. Safe because no
+    // screen edits requirements directly — if one is ever added, this has to
+    // learn to leave its rows alone.
+    const wantedIds = Object.keys(wanted)
+      .map((key) => byKey.get(key))
+      .filter((id): id is string => !!id);
+    await prisma.jobTitleSkill.deleteMany({ where: { jobTitleId: job.id, skillId: { notIn: wantedIds } } });
+
     for (const [key, requiredLevel] of Object.entries(wanted)) {
       const skillId = byKey.get(key);
       if (!skillId) continue; // a key that no longer exists is not a reason to fail the seed

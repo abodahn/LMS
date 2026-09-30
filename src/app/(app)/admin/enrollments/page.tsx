@@ -4,11 +4,11 @@ import { requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/locale";
 import { translate } from "@/lib/i18n";
-import { formatDate, formatHours } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { Card, EmptyState, SectionHeading, StatCard, StatusPill, TableShell } from "@/components/ui/primitives";
 import { JOB_FAMILIES } from "@/lib/constants";
-import { humanizeKey } from "@/lib/utils";
-import { AssignForm } from "./assign-form";
+import { AssignForm, RecurringForm } from "./assign-form";
+import { RecurringList } from "./recurring-list";
 import { ProofReview } from "./proof-review";
 import { HistoryForm } from "./history-form";
 import { localizeNames, NAME_I18N_SELECT } from "@/lib/i18n";
@@ -20,12 +20,8 @@ export default async function EnrollmentsPage() {
   const { dict, locale } = await getI18n();
   const t = (k: string) => translate(dict, k);
 
-  const [courses, departments, proofs, overdue, counts] = await Promise.all([
-    prisma.course.findMany({
-      where: { status: "PUBLISHED" },
-      orderBy: { title: "asc" },
-      select: { id: true, title: true, estimatedHours: true },
-    }),
+  const [departments, proofs, overdue, counts, jobTitles, locations, shifts, recurring] =
+    await Promise.all([
     prisma.department
       .findMany({ orderBy: { order: "asc" }, select: { id: true, ...NAME_I18N_SELECT } })
       .then((rows) => localizeNames(rows, locale)),
@@ -43,9 +39,44 @@ export default async function EnrollmentsPage() {
       take: 25,
     }),
     prisma.enrollment.groupBy({ by: ["status"], _count: { status: true } }),
+    prisma.jobTitle.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.location.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    // Shifts are free text on the employee record rather than a table, so the
+    // list is whatever is actually in use — which is also the only list that
+    // can assign to anybody.
+    prisma.user
+      .findMany({
+        where: { shift: { not: null }, deletedAt: null },
+        distinct: ["shift"],
+        select: { shift: true },
+        orderBy: { shift: "asc" },
+      })
+      .then((rows) => rows.map((r) => r.shift).filter((s): s is string => !!s)),
+    prisma.recurringAssignment.findMany({
+      include: { course: { select: { title: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   const countOf = (status: string) => counts.find((c) => c.status === status)?._count.status ?? 0;
+
+  const audienceOptions = {
+    departments,
+    jobFamilies: JOB_FAMILIES.map((f) => ({ value: f, label: t(`jobFamily.${f}`) })),
+    jobTitles,
+    locations,
+    shifts,
+  };
+
+  /** A rule stores an id; the list has to show the thing it points at. */
+  const audienceLabel = (audience: string, value: string | null) => {
+    if (!value) return null;
+    if (audience === "DEPARTMENT") return departments.find((d) => d.id === value)?.name ?? value;
+    if (audience === "JOB_TITLE") return jobTitles.find((j) => j.id === value)?.name ?? value;
+    if (audience === "LOCATION") return locations.find((l) => l.id === value)?.name ?? value;
+    if (audience === "JOB_FAMILY") return t(`jobFamily.${value}`);
+    return value;
+  };
 
   return (
     <div className="space-y-6">
@@ -62,11 +93,23 @@ export default async function EnrollmentsPage() {
         />
       </div>
 
-      <AssignForm
-        courses={courses.map((c) => ({ id: c.id, label: `${c.title} — ${formatHours(c.estimatedHours)}` }))}
-        departments={departments}
-        jobFamilies={JOB_FAMILIES.map((f) => ({ value: f, label: humanizeKey(f) }))}
-      />
+      <AssignForm options={audienceOptions} />
+
+      <RecurringForm options={audienceOptions} />
+
+      {recurring.length > 0 ? (
+        <RecurringList
+          rules={recurring.map((r) => ({
+            id: r.id,
+            course: r.course.title,
+            audience: r.audience,
+            audienceValue: audienceLabel(r.audience, r.audienceValue),
+            everyMonths: r.everyMonths,
+            isActive: r.isActive,
+            lastRunAt: r.lastRunAt ? formatDate(r.lastRunAt, locale) : null,
+          }))}
+        />
+      ) : null}
 
       <section>
         <h2 className="section-title mb-3">{t("learning.uploadProof")}</h2>

@@ -29,8 +29,9 @@ export default async function TeamMemberPage({ params }: PageProps<"/team/[userI
   // A manager sees only their own reports; admins with team.view see everyone.
   const allowed = member && (member.managerId === manager.id || manager.permissions.includes("users.view"));
   if (!member || !allowed) notFound();
+  const isOwnReport = member.managerId === manager.id;
 
-  const [attempts, enrollments, certificates, courses] = await Promise.all([
+  const [attempts, enrollments, certificates] = await Promise.all([
     prisma.assessmentAttempt.findMany({
       where: { userId, status: "GRADED", definition: { type: { in: ["PLACEMENT", "FINAL"] } } },
       orderBy: { submittedAt: "asc" },
@@ -42,11 +43,6 @@ export default async function TeamMemberPage({ params }: PageProps<"/team/[userI
       orderBy: { order: "asc" },
     }),
     prisma.certificate.findMany({ where: { userId, status: "VALID" } }),
-    prisma.course.findMany({
-      where: { status: "PUBLISHED", stillAvailable: true },
-      orderBy: { title: "asc" },
-      select: { id: true, title: true, estimatedHours: true },
-    }),
   ]);
 
   // The skills spine: what the job requires, what this person holds, and the
@@ -211,18 +207,33 @@ export default async function TeamMemberPage({ params }: PageProps<"/team/[userI
         </ul>
       </Card>
 
+      {/* Rating and planning are for the person's own manager. Someone who can
+          view everyone (an administrator) sees the matrix read-only, rather
+          than controls that the server would refuse on every change. */}
       <SkillMatrix
         profile={profile}
         dict={dict}
         locale={locale}
-        renderAction={(gap) => <RateControl userId={member.id} skillId={gap.skillId} level={gap.held} />}
+        renderAction={
+          isOwnReport && manager.permissions.includes("team.assess")
+            ? (gap) => (
+                <RateControl
+                  userId={member.id}
+                  skillId={gap.skillId}
+                  skillName={localized(gap, "name", locale)}
+                  level={gap.held}
+                />
+              )
+            : undefined
+        }
       />
 
-      <PlanPanel userId={member.id} goals={goals} hasGaps={profile.gaps.length > 0} />
+      {isOwnReport && manager.permissions.includes("team.assess") ? (
+        <PlanPanel userId={member.id} goals={goals} hasGaps={profile.gaps.length > 0} />
+      ) : null}
 
       <MemberActions
         userId={member.id}
-        courses={courses.map((c) => ({ id: c.id, title: c.title, hours: c.estimatedHours }))}
         currentGoals={member.profile?.managerGoals ?? ""}
         enrolledCourseIds={enrollments.map((e) => e.courseId)}
       />

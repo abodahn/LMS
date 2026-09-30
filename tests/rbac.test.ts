@@ -74,3 +74,20 @@ describe("hasPermission", () => {
     expect(hasPermission(["learning.self"], "users.manage")).toBe(false);
   });
 });
+
+import { ADMIN_NAV, EXPLORE_NAV, PRIMARY_NAV, ROLE_NAV } from "../src/lib/navigation";
+import { ICON_NAMES } from "../src/components/nav-icon";
+
+/**
+ * A nav icon that is not in the map falls back to Home without complaint, so a
+ * missing entry is invisible in review and obvious only to a user wondering why
+ * two menu items share a house. "calendar-days" shipped exactly like that.
+ */
+describe("navIconsResolve", () => {
+  it("every navigation entry names an icon that exists", () => {
+    const missing = [...PRIMARY_NAV, ...EXPLORE_NAV, ...ROLE_NAV, ...ADMIN_NAV]
+      .filter((item) => !ICON_NAMES.includes(item.icon))
+      .map((item) => `${item.href} → ${item.icon}`);
+    expect(missing).toEqual([]);
+  });
+});

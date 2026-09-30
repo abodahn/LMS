@@ -2,6 +2,7 @@
 // which has no request around it.
 import { prisma } from "./db";
 import { sendMail } from "./mailer";
+import { getDictionary, isLocale, localized, translate } from "./i18n";
 
 export type NotificationInput = {
   category: "LEARNING" | "ASSESSMENT" | "CERTIFICATE" | "MANAGER" | "SYSTEM";
@@ -10,6 +11,54 @@ export type NotificationInput = {
   link?: string;
   email?: boolean;
 };
+
+/**
+ * A parameter that differs per language: a course or skill row, rendered in the
+ * recipient's language through its Ar/Tr columns.
+ */
+export type LocalizedParam = { row: Record<string, unknown>; field: string };
+
+/**
+ * A notification written in the recipient's language, not the sender's.
+ *
+ * The text is stored already rendered, because a notification is a record of
+ * what somebody was told — re-translating it later would change history. So the
+ * language is decided here, from the person receiving it: a manager in Istanbul
+ * approving a goal for an operator in Cairo sends that operator Arabic.
+ *
+ * Titles must differ per event where several can be unread at once (include the
+ * course or skill in the title), because `notify` drops a second unread
+ * notification with an identical title as a duplicate.
+ */
+export async function notifyTranslated(
+  userId: string,
+  input: {
+    category: NotificationInput["category"];
+    titleKey: string;
+    bodyKey: string;
+    params?: Record<string, string | number | LocalizedParam>;
+    link?: string;
+    email?: boolean;
+  },
+) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { preferredLanguage: true } });
+  const preferred = user?.preferredLanguage;
+  const locale = isLocale(preferred) ? preferred : "en";
+  const dict = getDictionary(locale);
+
+  const params: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries(input.params ?? {})) {
+    params[k] = typeof v === "object" ? localized(v.row, v.field, locale) : v;
+  }
+
+  return notify(userId, {
+    category: input.category,
+    title: translate(dict, input.titleKey, params),
+    body: translate(dict, input.bodyKey, params),
+    link: input.link,
+    email: input.email,
+  });
+}
 
 /**
  * In-app is the default channel; email is opt-in per notification. Duplicate

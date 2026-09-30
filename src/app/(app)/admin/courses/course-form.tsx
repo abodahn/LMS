@@ -38,6 +38,7 @@ export type CourseFormValues = {
   isInternal: boolean;
   isTechnical: boolean;
   isMandatory: boolean;
+  requiresSignOff: boolean;
   isRecommended: boolean;
   youtubePlaylistId: string;
   rating: number | null;
@@ -331,6 +332,7 @@ export function CourseForm({
           <FlagSelect name="isInternal" label={t("form.internalCourse")} value={values.isInternal} />
           <FlagSelect name="isTechnical" label={t("form.technicalContent")} value={values.isTechnical} />
           <FlagSelect name="isMandatory" label={t("form.mandatory")} value={values.isMandatory} />
+          <FlagSelect name="requiresSignOff" label={t("form.requiresSignOff")} value={values.requiresSignOff} />
           <FlagSelect name="isRecommended" label={t("form.featured")} value={values.isRecommended} />
         </div>
       </Card>

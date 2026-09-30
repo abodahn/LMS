@@ -120,6 +120,7 @@ export default async function EditCoursePage({ params }: PageProps<"/admin/cours
           isInternal: course.isInternal,
           isTechnical: course.isTechnical,
           isMandatory: course.isMandatory,
+          requiresSignOff: course.requiresSignOff,
           isRecommended: course.isRecommended,
           youtubePlaylistId: course.youtubePlaylistId ?? "",
           rating: course.rating,

@@ -6,12 +6,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { awardBadges } from "@/lib/badges";
-import { notify } from "@/lib/notifications";
 import { recalcEnrollmentProgress, recordActivity } from "@/lib/learner";
 import { enrollFromRecommendations, targetDateFor } from "@/lib/recommendation/service";
 import { saveUpload, UploadError } from "@/lib/storage";
-import { issueCourseCertificate } from "@/lib/certificates";
+import { onCourseCompleted } from "@/lib/completion";
 
 export type LearningState = { error?: string; success?: string };
 
@@ -111,21 +109,6 @@ export async function saveLessonProgressAction(input: z.infer<typeof lessonSchem
   } catch {
     return { error: "errors.saveProgress" };
   }
-}
-
-async function onCourseCompleted(userId: string, enrollmentId: string) {
-  const enrollment = await prisma.enrollment.findUniqueOrThrow({
-    where: { id: enrollmentId },
-    include: { course: true },
-  });
-  await notify(userId, {
-    category: "LEARNING",
-    title: `Course complete: ${enrollment.course.title}`,
-    body: "Nice work. Your progress and learning hours have been updated.",
-    link: `/learning/${enrollmentId}`,
-  });
-  await issueCourseCertificate(userId, enrollmentId);
-  await awardBadges(userId);
 }
 
 export async function markExternalCompleteAction(enrollmentId: string): Promise<LearningState> {

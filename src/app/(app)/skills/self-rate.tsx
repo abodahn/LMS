@@ -16,18 +16,24 @@ const LEVELS = [0, 1, 2, 3, 4, 5];
  * already exists — a silent no-op would leave someone believing they had
  * changed their record when they had not.
  */
-export function SelfRate({ skillId, level }: { skillId: string; level: number }) {
+export function SelfRate({ skillId, skillName, level }: { skillId: string; skillName: string; level: number }) {
   const t = useT();
   const msg = useMessage();
-  const [state, submit] = useActionState<SkillState, FormData>(selfRateAction, {});
+  // A refused rating remounts the select on the stored level, so the screen
+  // never shows a value that was not saved.
+  const [state, submit] = useActionState<SkillState & { attempt: number }, FormData>(
+    async (prev, form) => ({ ...(await selfRateAction(prev, form)), attempt: prev.attempt + 1 }),
+    { attempt: 0 },
+  );
 
   return (
     <form action={submit} className="flex flex-col items-end gap-1">
       <input type="hidden" name="skillId" value={skillId} />
       <Select
+        key={state.error ? `${level}:${state.attempt}` : String(level)}
         name="level"
         defaultValue={String(level)}
-        aria-label={t("skills.selfRate")}
+        aria-label={`${t("skills.selfRate")}: ${skillName}`}
         className="h-8 w-[136px] text-[12px]"
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
       >

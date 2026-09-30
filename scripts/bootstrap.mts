@@ -71,6 +71,13 @@ async function ensureVocabulary() {
   const counts = await seedSkills(prisma);
   console.log(`[bootstrap] ${counts.skills} skills, ${counts.requirements} job requirements`);
 
+  // Which courses develop which skills. Derived, not seeded: without it every
+  // gap on every development plan says "no course yet", and before this ran
+  // here it was a manual script that no deploy ever called.
+  const { mapCourseSkills } = await import("../src/lib/course-skill-map");
+  const mapped = await mapCourseSkills(prisma);
+  console.log(`[bootstrap] ${mapped.links} course-skill links`);
+
   await ensurePermissions();
 }
 

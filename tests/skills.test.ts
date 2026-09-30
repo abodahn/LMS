@@ -106,3 +106,46 @@ describe("rankCourses", () => {
     expect(list.map((c) => c.title)).toEqual(["b", "a"]);
   });
 });
+
+import { fold, matchSkills } from "../src/lib/course-skill-map";
+
+/**
+ * Each case here was a real false positive or a real miss at nine thousand
+ * courses. A wrong match puts an unrelated course at the top of somebody's
+ * development plan, because short courses rank first.
+ */
+describe("matchSkills", () => {
+  const skills = (title: string) => matchSkills(title).map((m) => m.skill);
+
+  it("matches whole words, never substrings", () => {
+    expect(skills("Enterprise architecture on Azure")).not.toContain("ERP_OPERATION");
+    expect(skills("Global ERP implementations")).toContain("ERP_OPERATION");
+  });
+
+  it("treats a hyphen as part of the word", () => {
+    expect(skills("Pre-production planning for events")).not.toContain("PRODUCTION_SCHEDULING");
+  });
+
+  it("does not map vendor product courses to process skills", () => {
+    expect(skills("Configure quality control in Dynamics 365 Supply Chain Management")).not.toContain("INLINE_QC");
+    expect(skills("Statistical quality control for garment lines")).toContain("INLINE_QC");
+  });
+
+  it("still maps tool courses whoever sells them", () => {
+    expect(skills("Analyze data in Excel with Copilot on Azure")).toContain("EXCEL");
+  });
+
+  it("does not read a job coach as coaching skills", () => {
+    expect(skills("The role of the job coach in supported employment")).not.toContain("ON_JOB_TRAINING");
+    expect(skills("Coaching and Mentoring for new supervisors")).toContain("ON_JOB_TRAINING");
+  });
+
+  it("matches Turkish text written with a capital dotted İ", () => {
+    expect(fold("İŞ İNGİLİZCESİ")).toBe("iş ingilizcesi");
+    expect(skills("İş İngilizcesi: e-posta ve toplantı")).toContain("BUSINESS_ENGLISH");
+  });
+
+  it("matches Arabic phrases", () => {
+    expect(skills("تعلم اللغة التركية من الصفر")).toContain("OPERATIONAL_TURKISH");
+  });
+});

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { notify } from "@/lib/notifications";
+import { notify, notifyTranslated } from "@/lib/notifications";
 import { generateRecommendations } from "@/lib/recommendation/service";
 
 export type TeamState = { error?: string; success?: string };
@@ -207,10 +207,18 @@ export async function decideGoalAction(_prev: TeamState, formData: FormData): Pr
     });
 
     if (parsed.data.decision === "APPROVED") {
-      await notify(parsed.data.userId, {
+      // The skill is in the title so two approvals are two notifications:
+      // notify() drops an unread one with an identical title as a duplicate.
+      await notifyTranslated(parsed.data.userId, {
         category: "MANAGER",
-        title: `${manager.fullName} agreed a development goal with you`,
-        body: `${goal.skill.name}: level ${goal.fromLevel} to ${goal.targetLevel}.`,
+        titleKey: "notify.goalAgreedTitle",
+        bodyKey: "notify.goalAgreedBody",
+        params: {
+          skill: { row: goal.skill, field: "name" },
+          manager: manager.fullName,
+          from: goal.fromLevel,
+          to: goal.targetLevel,
+        },
         link: "/skills",
       });
     }
@@ -225,6 +233,58 @@ export async function decideGoalAction(_prev: TeamState, formData: FormData): Pr
     });
 
     revalidatePath(`/team/${parsed.data.userId}`);
+    return { success: "common.saved" };
+  } catch {
+    return { error: "errors.forbidden" };
+  }
+}
+
+const signOffSchema = z.object({
+  enrollmentId: z.string().min(1),
+  observation: z.string().trim().min(10).max(1000),
+  skillId: z.string().trim().optional(),
+  skillLevel: z.coerce.number().int().min(0).max(5).optional(),
+});
+
+/**
+ * A supervisor confirming they watched the work done.
+ *
+ * The observation has a minimum length on purpose. The whole value of this step
+ * is that somebody looked and wrote down what they saw; a one-word sign-off is
+ * a signature, and a signature is what the system already had.
+ */
+export async function signOffAction(_prev: TeamState, formData: FormData): Promise<TeamState> {
+  const supervisor = await requirePermission("team.assess");
+  const parsed = signOffSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "errors.validation" };
+
+  try {
+    const enrollment = await prisma.enrollment.findUniqueOrThrow({
+      where: { id: parsed.data.enrollmentId },
+      include: { course: { select: { title: true } } },
+    });
+    const member = await assertMyReport(supervisor.id, enrollment.userId);
+
+    const { signOffPractical } = await import("@/lib/sign-off");
+    const result = await signOffPractical({
+      enrollmentId: enrollment.id,
+      signedById: supervisor.id,
+      observation: parsed.data.observation,
+      skillId: parsed.data.skillId || null,
+      skillLevel: parsed.data.skillId ? (parsed.data.skillLevel ?? null) : null,
+    });
+    if (!result.ok) return { error: "errors.validation" };
+
+    await audit({
+      actorId: supervisor.id,
+      actorName: supervisor.fullName,
+      action: "PRACTICAL_SIGN_OFF",
+      entity: "Enrollment",
+      entityId: enrollment.id,
+      summary: `${member.fullName} · ${enrollment.course.title}`,
+    });
+
+    revalidatePath("/team/sign-off");
     return { success: "common.saved" };
   } catch {
     return { error: "errors.forbidden" };

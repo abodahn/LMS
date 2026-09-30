@@ -4,10 +4,10 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
-import { Field, FormError, FormSuccess, Select, TextArea, TextInput } from "@/components/ui/form";
+import { Field, FormError, FormSuccess, TextArea, TextInput } from "@/components/ui/form";
 import { useMessage, useT } from "@/components/i18n-provider";
+import { CoursePicker } from "@/components/course-picker";
 import { nominateCourseAction, setDevelopmentGoalsAction, type TeamState } from "../actions";
-import { formatHours } from "@/lib/utils";
 
 function Submit({ label }: { label: string }) {
   const t = useT();
@@ -21,12 +21,10 @@ function Submit({ label }: { label: string }) {
 
 export function MemberActions({
   userId,
-  courses,
   currentGoals,
   enrolledCourseIds,
 }: {
   userId: string;
-  courses: { id: string; title: string; hours: number }[];
   currentGoals: string;
   enrolledCourseIds: string[];
 }) {
@@ -34,7 +32,6 @@ export function MemberActions({
   const msg = useMessage();
   const [nominateState, nominate] = useActionState<TeamState, FormData>(nominateCourseAction, {});
   const [goalsState, saveGoals] = useActionState<TeamState, FormData>(setDevelopmentGoalsAction, {});
-  const available = courses.filter((c) => !enrolledCourseIds.includes(c.id));
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
@@ -47,16 +44,13 @@ export function MemberActions({
 
           <Field label={t("common.course")} required>
             {(p) => (
-              <Select {...p} name="courseId" required defaultValue="">
-                <option value="" disabled>
-                  {t("admin.selectEmployee")}
-                </option>
-                {available.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title} — {formatHours(c.hours)}
-                  </option>
-                ))}
-              </Select>
+              <CoursePicker
+                id={p.id}
+                aria-describedby={p["aria-describedby"]}
+                name="courseId"
+                required
+                exclude={enrolledCourseIds}
+              />
             )}
           </Field>
 

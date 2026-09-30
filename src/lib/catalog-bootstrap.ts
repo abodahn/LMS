@@ -74,17 +74,23 @@ function countRows(path: string): number {
   return Math.max(0, rows - 1 + (text.endsWith("\n") ? 0 : 1));
 }
 
+/** Failed slices in a row before a file is left for the next boot. */
+const MAX_CONSECUTIVE_FAILURES = 3;
+
+type SliceResult = { ok: true; remaining: number } | { ok: false; retryable: boolean };
+
 /**
  * Runs one import slice and reports how many rows it left behind.
  *
- * Returns null when the slice could not run at all, which is the difference
- * between "nothing left to do" and "stop trying".
+ * A slice that could not start at all (no tsx, a spawn error) is not worth
+ * retrying — the next attempt would fail the same way. A slice that started and
+ * died, most likely killed for memory, is: --new-only picks up where it stopped.
  */
-function importSlice(args: string[]): Promise<{ remaining: number } | null> {
+function importSlice(args: string[]): Promise<SliceResult> {
   const cli = "node_modules/tsx/dist/cli.mjs";
   if (!existsSync(cli)) {
     console.warn("[catalogue] tsx not present — cannot import in a child process");
-    return Promise.resolve(null);
+    return Promise.resolve({ ok: false, retryable: false });
   }
 
   return new Promise((resolve) => {
@@ -102,7 +108,7 @@ function importSlice(args: string[]): Promise<{ remaining: number } | null> {
 
     child.on("error", () => {
       clearTimeout(kill);
-      resolve(null);
+      resolve({ ok: false, retryable: false });
     });
 
     child.on("close", (code) => {
@@ -112,10 +118,10 @@ function importSlice(args: string[]): Promise<{ remaining: number } | null> {
         // an error worth shouting about — the next one resumes. Only the reason
         // is worth keeping.
         console.warn(`[catalogue] slice exited ${code}: ${(err || out).trim().split("\n").pop() ?? ""}`);
-        resolve(null);
+        resolve({ ok: false, retryable: true });
         return;
       }
-      resolve({ remaining: Number(/REMAINING=(\d+)/.exec(out)?.[1] ?? 0) });
+      resolve({ ok: true, remaining: Number(/REMAINING=(\d+)/.exec(out)?.[1] ?? 0) });
     });
   });
 }
@@ -146,7 +152,7 @@ export async function ensureCatalogue(): Promise<{ imported: number; skipped: bo
         // filed as uncategorised, and could never fix themselves while "already
         // stored" meant "leave alone".
         const done = await importSlice([path]);
-        if (done) console.log(`[catalogue] ${path}: refreshed (${rows} rows)`);
+        if (done.ok) console.log(`[catalogue] ${path}: refreshed (${rows} rows)`);
         continue;
       }
 
@@ -158,11 +164,24 @@ export async function ensureCatalogue(): Promise<{ imported: number; skipped: bo
       // turns on, and answering it by parsing another process's log is a way to
       // stop early over a missed line.
       let slices = 0;
+      let failures = 0;
       const fileStart = await prisma.course.count();
       for (;;) {
         const at = await prisma.course.count();
         const done = await importSlice([path, "--new-only", "--limit", String(SLICE)]);
-        if (!done) break;
+        if (!done.ok) {
+          // One slice dying is expected on a small instance; only a run of them
+          // means something is actually wrong. Each retry still counts toward
+          // MAX_SLICES_PER_FILE below, so this can never spin.
+          if (!done.retryable || ++failures >= MAX_CONSECUTIVE_FAILURES) {
+            console.log(`[catalogue] ${path}: leaving for the next boot after ${failures} failed slice(s)`);
+            break;
+          }
+          if (++slices >= MAX_SLICES_PER_FILE) break;
+          await new Promise((r) => setTimeout(r, BETWEEN_SLICES_MS * 5));
+          continue;
+        }
+        failures = 0;
         if (done.remaining === 0) break;
 
         if ((await prisma.course.count()) === at) {
@@ -183,7 +202,14 @@ export async function ensureCatalogue(): Promise<{ imported: number; skipped: bo
     }
 
     const after = await prisma.course.count();
-    if (after !== before) console.log(`[catalogue] done — ${before} → ${after} courses`);
+    if (after !== before) {
+      console.log(`[catalogue] done — ${before} → ${after} courses`);
+      // New courses are only useful to a development plan once they are mapped
+      // to skills; boot mapped the catalogue as it was, before this import.
+      const { mapCourseSkills } = await import("./course-skill-map");
+      const mapped = await mapCourseSkills(prisma);
+      console.log(`[catalogue] ${mapped.links} course-skill links`);
+    }
     return { imported, skipped: imported === 0 };
   } catch (error) {
     // Never fatal. A site serving the courses it has is a working site.

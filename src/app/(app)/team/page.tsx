@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Clock, TrendingUp, Users } from "lucide-react";
 import { requirePermission } from "@/lib/auth";
+import { awaitingSignOff } from "@/lib/sign-off";
 import { getI18n } from "@/lib/locale";
 import { translate } from "@/lib/i18n";
 import { getTeamStats } from "@/lib/analytics";
@@ -32,16 +33,29 @@ export default async function TeamPage() {
 
   const maxLevel = Math.max(1, ...Object.values(stats.distribution));
 
+  // Same pattern as the review queue: the button only appears when there is
+  // something in it, so its presence is itself the signal.
+  const signOffs = user.permissions.includes("team.assess") ? (await awaitingSignOff(user.id)).length : 0;
+
   return (
     <div className="space-y-6">
       <SectionHeading
         title={t("manager.title")}
         subtitle={t("manager.subtitle")}
         action={
-          stats.totals.pendingReviews > 0 ? (
-            <LinkButton href="/team/reviews" size="sm">
-              {t("manager.reviewQueue")} ({stats.totals.pendingReviews})
-            </LinkButton>
+          stats.totals.pendingReviews > 0 || signOffs > 0 ? (
+            <span className="flex flex-wrap gap-2">
+              {signOffs > 0 ? (
+                <LinkButton href="/team/sign-off" size="sm">
+                  {t("signOff.title")} ({signOffs})
+                </LinkButton>
+              ) : null}
+              {stats.totals.pendingReviews > 0 ? (
+                <LinkButton href="/team/reviews" size="sm">
+                  {t("manager.reviewQueue")} ({stats.totals.pendingReviews})
+                </LinkButton>
+              ) : null}
+            </span>
           ) : undefined
         }
       />

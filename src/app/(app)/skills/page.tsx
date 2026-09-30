@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/locale";
@@ -10,7 +11,10 @@ import { SkillMatrix } from "@/components/skill-matrix";
 import { Card, SectionHeading } from "@/components/ui/primitives";
 import { SelfRate } from "./self-rate";
 
-export const metadata: Metadata = { title: "Skills" };
+export async function generateMetadata(): Promise<Metadata> {
+  const { dict } = await getI18n();
+  return { title: translate(dict, "skills.title") };
+}
 
 export default async function SkillsPage() {
   const user = await requireUser();
@@ -48,7 +52,9 @@ export default async function SkillsPage() {
         profile={profile}
         dict={dict}
         locale={locale}
-        renderAction={(gap) => <SelfRate skillId={gap.skillId} level={gap.held} />}
+        renderAction={(gap) => (
+          <SelfRate skillId={gap.skillId} skillName={localized(gap, "name", locale)} level={gap.held} />
+        )}
       />
 
       <Card className="p-5">
@@ -62,7 +68,16 @@ export default async function SkillsPage() {
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="text-[13px] font-medium text-[var(--brand-ink)]">{g.name}</span>
                   <span className="text-[12px] text-[var(--brand-muted)]">
-                    {g.fromLevel} → {g.targetLevel} · {t(`skills.${g.status.toLowerCase()}`)}
+                    <span
+                      aria-label={translate(dict, "skills.levelRange", { from: g.fromLevel, to: g.targetLevel })}
+                      className="inline-flex items-center gap-1 tabular-nums"
+                    >
+                      <span aria-hidden>{g.fromLevel}</span>
+                      <ArrowRight size={12} className="rtl:rotate-180" aria-hidden />
+                      <span aria-hidden>{g.targetLevel}</span>
+                    </span>
+                    {" · "}
+                    {t(`skills.${g.status.toLowerCase()}`)}
                     {g.targetDate ? ` · ${t("skills.targetDate")} ${formatDate(g.targetDate, locale)}` : ""}
                   </span>
                 </div>
@@ -86,7 +101,7 @@ export default async function SkillsPage() {
                           {" · "}
                           {formatHours(c.estimatedHours)}
                           {" · "}
-                          {t("skills.toLevel")} {c.targetLevel}
+                          {translate(dict, "skills.toLevel", { level: c.targetLevel })}
                         </span>
                       </li>
                     ))}

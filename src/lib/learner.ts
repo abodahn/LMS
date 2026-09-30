@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "./db";
+import { canComplete } from "./completion-rule";
 import { getCertificationPolicy } from "./settings";
 import { computeStreak, todayKey } from "./utils";
 
@@ -242,6 +243,7 @@ export async function recalcEnrollmentProgress(enrollmentId: string) {
     include: {
       course: { include: { modules: { include: { lessons: true } } } },
       lessonProgress: true,
+      signOff: true,
     },
   });
   if (!enrollment) return null;
@@ -250,7 +252,18 @@ export async function recalcEnrollmentProgress(enrollmentId: string) {
   const doneIds = new Set(enrollment.lessonProgress.filter((p) => p.status === "COMPLETED").map((p) => p.lessonId));
   const percent = lessons.length === 0 ? enrollment.progressPercent : Math.round((lessons.filter((l) => doneIds.has(l.id)).length / lessons.length) * 100);
 
-  const complete = lessons.length > 0 && percent >= 100;
+  // Every completion route arrives here — lessons and SCORM alike — so this is
+  // the one place the sign-off rule has to hold. A course that must be
+  // demonstrated stays open at 100% until a supervisor has written down what
+  // they watched; `signOffPractical` is what closes it.
+  const complete =
+    lessons.length > 0 &&
+    percent >= 100 &&
+    canComplete({
+      requiresSignOff: enrollment.course.requiresSignOff,
+      progressPercent: percent,
+      hasSignOff: !!enrollment.signOff,
+    }).ok;
   return prisma.enrollment.update({
     where: { id: enrollmentId },
     data: {

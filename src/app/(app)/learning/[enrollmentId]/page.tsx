@@ -32,6 +32,7 @@ export default async function CoursePage({ params }: PageProps<"/learning/[enrol
         },
       },
       lessonProgress: true,
+      signOff: { include: { signedBy: { select: { fullName: true } } } },
       proofs: { orderBy: { uploadedAt: "desc" } },
       feedback: true,
     },
@@ -63,6 +64,17 @@ export default async function CoursePage({ params }: PageProps<"/learning/[enrol
         subtitle={`${course.provider.name} · ${formatHours(course.estimatedHours)}${course.aiLevel ? ` · ${course.aiLevel.code}` : ""}`}
         action={<StatusPill status={enrollment.status} />}
       />
+
+      {course.requiresSignOff &&
+      enrollment.progressPercent >= 100 &&
+      !enrollment.signOff &&
+      enrollment.status !== "COMPLETED" ? (
+        // Otherwise this reads as a bug: everything is ticked, the course is not
+        // finished, and nothing on the page says why.
+        <Alert tone="info" title={t("signOff.awaiting")}>
+          {t("signOff.awaitingBody")}
+        </Alert>
+      ) : null}
 
       <Card className="p-5">
         <p className="text-sm leading-relaxed text-[var(--brand-charcoal)]">

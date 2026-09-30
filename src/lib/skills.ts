@@ -249,22 +249,30 @@ export async function proposeDevelopmentPlan(userId: string, createdById: string
 
   const shortlist = shortlistGaps(gaps);
 
-  const existing = new Set(
-    (await prisma.developmentGoal.findMany({ where: { userId }, select: { skillId: true } })).map((g) => g.skillId),
-  );
+  // Open goals are the manager's and are never touched. A goal that was closed
+  // or dropped is history, and a gap that has opened again since deserves a
+  // fresh proposal — one row per person and skill means reopening that row.
+  const goals = await prisma.developmentGoal.findMany({ where: { userId }, select: { skillId: true, status: true } });
+  const open = new Set(goals.filter((g) => g.status === "PROPOSED" || g.status === "APPROVED").map((g) => g.skillId));
 
   let created = 0;
   for (const gap of shortlist) {
-    if (existing.has(gap.skillId)) continue;
-    await prisma.developmentGoal.create({
-      data: {
-        userId,
-        skillId: gap.skillId,
-        fromLevel: gap.held,
-        targetLevel: gap.required,
-        status: "PROPOSED",
-        createdById,
-      },
+    if (open.has(gap.skillId)) continue;
+    const fresh = {
+      fromLevel: gap.held,
+      targetLevel: gap.required,
+      status: "PROPOSED",
+      targetDate: null,
+      note: null,
+      createdById,
+      approvedById: null,
+      approvedAt: null,
+      completedAt: null,
+    };
+    await prisma.developmentGoal.upsert({
+      where: { userId_skillId: { userId, skillId: gap.skillId } },
+      update: fresh,
+      create: { userId, skillId: gap.skillId, ...fresh },
     });
     created++;
   }
@@ -312,10 +320,20 @@ export async function rateSkill(input: {
 
   // A goal whose target has been reached closes itself. Left open, a plan fills
   // up with things already done and stops meaning anything.
+  //
+  // Only on observed evidence. A goal is something a manager agreed; letting
+  // the employee close it by claiming the level would hand them a switch over
+  // their manager's commitment, and the closed goal would drop out of every
+  // view the manager could have reopened it from.
   const goal = await prisma.developmentGoal.findUnique({
     where: { userId_skillId: { userId: input.userId, skillId: input.skillId } },
   });
-  if (goal && (goal.status === "PROPOSED" || goal.status === "APPROVED") && level >= goal.targetLevel) {
+  if (
+    goal &&
+    input.source !== "SELF" &&
+    (goal.status === "PROPOSED" || goal.status === "APPROVED") &&
+    level >= goal.targetLevel
+  ) {
     await prisma.developmentGoal.update({
       where: { id: goal.id },
       data: { status: "DONE", completedAt: new Date() },

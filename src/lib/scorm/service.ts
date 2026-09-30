@@ -1,3 +1,4 @@
+import { onCourseCompleted } from "../completion";
 import { prisma } from "../db";
 import { parseJson } from "../utils";
 import { recalcEnrollmentProgress } from "../learner";
@@ -147,8 +148,18 @@ export async function commitScorm(input: {
       },
     });
   }
+  const before = await prisma.enrollment.findUnique({
+    where: { id: input.enrollmentId },
+    select: { status: true },
+  });
   const enrollment = await recalcEnrollmentProgress(input.enrollmentId);
   progressPercent = enrollment?.progressPercent ?? 0;
+
+  // A package passing is a completion like any other and gets the same
+  // follow-through — until this, a SCORM course finished with no certificate.
+  if (enrollment?.status === "COMPLETED" && before?.status !== "COMPLETED") {
+    await onCourseCompleted(enrollment.userId, enrollment.id);
+  }
 
   return { lessonStatus, finished, lessonCompleted: succeeded, progressPercent };
 }

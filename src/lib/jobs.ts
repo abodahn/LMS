@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { getSetting, setSetting } from "./settings";
 import { runReminderRules } from "./notifications";
 import { sweepCourseLinks } from "./links";
+import { runRecurringAssignments } from "./assignments";
 import { audit } from "./audit";
 
 /**
@@ -17,7 +18,7 @@ import { audit } from "./audit";
  * jobs, and a key/value store already exists for exactly this kind of state.
  */
 
-export type JobKey = "reminders" | "linkSweep";
+export type JobKey = "reminders" | "linkSweep" | "recurringAssignments";
 
 type Job = {
   key: JobKey;
@@ -59,6 +60,18 @@ export const JOBS: Job[] = [
     run: async () => {
       const r = await sweepCourseLinks({ limit: 250 });
       return `${r.checked} checked, ${r.working} ok, ${r.broken} failing, ${r.withdrawn} withdrawn, ${r.recovered} recovered`;
+    },
+  },
+  {
+    key: "recurringAssignments",
+    // Every rule is evaluated daily and the cycle is counted per person, so a
+    // daily check does not mean daily training — only people who are new to the
+    // audience or whose last completion has expired are touched.
+    everyHours: 24,
+    label: "Recurring training",
+    run: async () => {
+      const r = await runRecurringAssignments();
+      return `${r.rules} rule(s) acted, ${r.assigned} assigned, ${r.refreshed} refreshed`;
     },
   },
 ];

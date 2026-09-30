@@ -52,6 +52,7 @@ export function emptyCourseValues(providerId: string): CourseFormValues {
     isInternal: false,
     isTechnical: false,
     isMandatory: false,
+    requiresSignOff: false,
     isRecommended: false,
     youtubePlaylistId: "",
     rating: null,
