@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { prisma } from "./db";
 
@@ -13,27 +14,34 @@ import { prisma } from "./db";
  * — migrations, reference data, the first administrator — and the catalogue
  * fills in behind a working site.
  *
- * **Memory is the constraint.** The instance this runs on has 512MB.
- * Validating a whole file builds a preview holding both the raw and the parsed
- * copy of every row, and `commitCourseImport` validates its input again, so a
- * large file at once costs several times its own size. Exceeding that kills the
- * container, which restarts and begins again from nothing — a loop that never
- * completes and takes the site down with it. Hence one file at a time, small
- * batches, and large files held back unless explicitly asked for.
+ * **Memory is the constraint, and it is not the JS heap.** Importing grows
+ * resident memory by roughly a quarter of a megabyte per row, and it keeps
+ * growing with a heap cap well below the total, because the cost is native: the
+ * SQLite driver's own allocations, which releasing a batch does not return.
+ * Smaller batches therefore buy nothing — ten thousand rows in one process will
+ * exhaust a small instance whatever the batch size. Exiting the process is what
+ * returns the memory.
+ *
+ * So no import runs in the server. Each slice is a child process that does a few
+ * hundred rows and exits, and `--new-only` means the next one resumes where it
+ * stopped. A slice that dies costs only its own rows: the server is untouched,
+ * the site stays up, and the work still converges.
  */
 
-/**
- * Rows a file may hold and still be imported without being asked for. A small
- * file costs seconds and cannot destabilise anything; the eight-thousand-row
- * Microsoft parts can, and wait for LOAD_CATALOGUE=on.
- */
+/** Rows a file may hold and still be re-imported whole rather than sliced. */
 const AUTO_IMPORT_LIMIT = 500;
 
-/** Rows per batch, so peak memory is flat rather than proportional to the file. */
-const CHUNK = 400;
+/** Rows per child process. Keeps a slice's peak well inside a small instance. */
+const SLICE = 300;
 
-/** Codes per lookup — SQLite refuses a very long parameter list. */
-const LOOKUP_CHUNK = 300;
+/** A slice is a few hundred writes against SQLite, not a request. */
+const SLICE_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** Breathing room between slices, so importing never starves a request. */
+const BETWEEN_SLICES_MS = 2000;
+
+/** Guard against looping forever on a file that cannot make progress. */
+const MAX_SLICES_PER_FILE = 60;
 
 let running = false;
 
@@ -67,22 +75,49 @@ function countRows(path: string): number {
 }
 
 /**
- * How many of these exact codes are already stored.
+ * Runs one import slice and reports how many rows it left behind.
  *
- * Asked per file, against that file's own codes, rather than counting every
- * imported course at once. The global count was wrong in a way that only
- * appeared once the catalogue was part-loaded: with six thousand Microsoft
- * courses present, a later 98-row language file looked long since imported and
- * was skipped for good. A file is now judged only on its own rows.
+ * Returns null when the slice could not run at all, which is the difference
+ * between "nothing left to do" and "stop trying".
  */
-async function alreadyStored(codes: string[]): Promise<number> {
-  let found = 0;
-  for (let i = 0; i < codes.length; i += LOOKUP_CHUNK) {
-    found += await prisma.course.count({
-      where: { code: { in: codes.slice(i, i + LOOKUP_CHUNK) } },
-    });
+function importSlice(args: string[]): Promise<{ remaining: number } | null> {
+  const cli = "node_modules/tsx/dist/cli.mjs";
+  if (!existsSync(cli)) {
+    console.warn("[catalogue] tsx not present — cannot import in a child process");
+    return Promise.resolve(null);
   }
-  return found;
+
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [cli, "scripts/import-courses-csv.mts", ...args], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: process.env,
+    });
+
+    let out = "";
+    let err = "";
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (err += d));
+
+    const kill = setTimeout(() => child.kill("SIGTERM"), SLICE_TIMEOUT_MS);
+
+    child.on("error", () => {
+      clearTimeout(kill);
+      resolve(null);
+    });
+
+    child.on("close", (code) => {
+      clearTimeout(kill);
+      if (code !== 0) {
+        // A slice killed for memory is expected on a small instance and is not
+        // an error worth shouting about — the next one resumes. Only the reason
+        // is worth keeping.
+        console.warn(`[catalogue] slice exited ${code}: ${(err || out).trim().split("\n").pop() ?? ""}`);
+        resolve(null);
+        return;
+      }
+      resolve({ remaining: Number(/REMAINING=(\d+)/.exec(out)?.[1] ?? 0) });
+    });
+  });
 }
 
 export async function ensureCatalogue(): Promise<{ imported: number; skipped: boolean }> {
@@ -90,62 +125,65 @@ export async function ensureCatalogue(): Promise<{ imported: number; skipped: bo
   running = true;
 
   try {
+    if (process.env.LOAD_CATALOGUE === "off") {
+      console.log("[catalogue] LOAD_CATALOGUE=off — not importing");
+      return { imported: 0, skipped: true };
+    }
+
     const present = catalogueFiles().filter((f) => existsSync(f));
     if (present.length === 0) return { imported: 0, skipped: true };
 
-    const everything = process.env.LOAD_CATALOGUE === "on";
-    const sized = present.map((path) => ({ path, rows: countRows(path) }));
-    const eligible = everything ? sized : sized.filter((f) => f.rows <= AUTO_IMPORT_LIMIT);
-    const deferred = sized.length - eligible.length;
-
-    if (deferred > 0) {
-      console.log(`[catalogue] ${deferred} large file(s) held back — set LOAD_CATALOGUE=on to import them`);
-    }
-    if (eligible.length === 0) return { imported: 0, skipped: true };
-
-    const { parseCsv } = await import("./import/parse");
-    const { validateCourseRows, commitCourseImport } = await import("./import/courses");
+    const before = await prisma.course.count();
     let imported = 0;
 
-    for (const { path } of eligible) {
-      // Parsed inside the loop so only one file is ever held in memory.
-      const { headers, rows } = parseCsv(readFileSync(path, "utf8"));
-      const codes = rows.map((r) => r.Code).filter(Boolean);
+    for (const path of present) {
+      const rows = countRows(path);
 
-      // Only a large file is worth skipping. A small one costs a couple of
-      // seconds, and re-importing it is how its rows pick up reference data
-      // that arrived after they did: the language courses were imported before
-      // the Languages category existed, were filed as uncategorised, and could
-      // never fix themselves while "already stored" meant "leave alone".
-      if (rows.length > AUTO_IMPORT_LIMIT) {
-        const stored = await alreadyStored(codes);
-        if (stored >= codes.length) {
-          console.log(`[catalogue] ${path}: already loaded (${stored} courses)`);
-          continue;
+      if (rows <= AUTO_IMPORT_LIMIT) {
+        // Small files are re-imported whole, every boot. That is how their rows
+        // pick up reference data that arrived after they did: the language
+        // courses were imported before the Languages category existed, were
+        // filed as uncategorised, and could never fix themselves while "already
+        // stored" meant "leave alone".
+        const done = await importSlice([path]);
+        if (done) console.log(`[catalogue] ${path}: refreshed (${rows} rows)`);
+        continue;
+      }
+
+      // Large files resume: only rows the catalogue does not already have, a
+      // few hundred at a time, until a slice reports nothing left.
+      //
+      // Progress is measured against the database, not against what the child
+      // said it did. Whether a slice helped is the question the whole loop
+      // turns on, and answering it by parsing another process's log is a way to
+      // stop early over a missed line.
+      let slices = 0;
+      const fileStart = await prisma.course.count();
+      for (;;) {
+        const at = await prisma.course.count();
+        const done = await importSlice([path, "--new-only", "--limit", String(SLICE)]);
+        if (!done) break;
+        if (done.remaining === 0) break;
+
+        if ((await prisma.course.count()) === at) {
+          // Rows left, but the catalogue did not grow — every remaining row is
+          // invalid or a duplicate, and another slice would do the same again.
+          console.log(`[catalogue] ${path}: ${done.remaining} row(s) cannot be imported, moving on`);
+          break;
         }
+        if (++slices >= MAX_SLICES_PER_FILE) {
+          console.log(`[catalogue] ${path}: ${done.remaining} row(s) left for the next boot`);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, BETWEEN_SLICES_MS));
       }
-
-      const started = Date.now();
-      let created = 0;
-      let updated = 0;
-
-      for (let i = 0; i < rows.length; i += CHUNK) {
-        const preview = await validateCourseRows(headers, rows.slice(i, i + CHUNK));
-        const result = await commitCourseImport(preview, { trustLinks: true });
-        created += result.created;
-        updated += result.updated;
-
-        // Yield, so importing never starves a request.
-        await new Promise((r) => setTimeout(r, 250));
-      }
-
-      imported += created;
-      console.log(
-        `[catalogue] ${path}: +${created} new, ${updated} updated (${Math.round((Date.now() - started) / 1000)}s)`,
-      );
+      const fileImported = (await prisma.course.count()) - fileStart;
+      imported += fileImported;
+      if (fileImported > 0) console.log(`[catalogue] ${path}: +${fileImported} courses`);
     }
 
-    if (imported > 0) console.log(`[catalogue] done — ${await prisma.course.count()} courses`);
+    const after = await prisma.course.count();
+    if (after !== before) console.log(`[catalogue] done — ${before} → ${after} courses`);
     return { imported, skipped: imported === 0 };
   } catch (error) {
     // Never fatal. A site serving the courses it has is a working site.
