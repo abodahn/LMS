@@ -12,6 +12,7 @@ export const PERMISSIONS = {
   "team.view": "View own team's learning progress",
   "team.nominate": "Nominate or recommend learning for team members",
   "team.review": "Review team capstone submissions",
+  "team.assess": "Rate a team member's skills and agree a development plan",
   // people admin
   "users.view": "View all employees",
   "users.manage": "Create, edit, deactivate employees",
@@ -51,12 +52,13 @@ export type PermissionKey = keyof typeof PERMISSIONS;
 
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   EMPLOYEE: ["learning.self"],
-  MANAGER: ["learning.self", "team.view", "team.nominate", "team.review", "analytics.team"],
+  MANAGER: ["learning.self", "team.view", "team.nominate", "team.review", "team.assess", "analytics.team"],
   ADMIN: [
     "learning.self",
     "team.view",
     "team.nominate",
     "team.review",
+    "team.assess",
     "users.view",
     "users.manage",
     "users.import",

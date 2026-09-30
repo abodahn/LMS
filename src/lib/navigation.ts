@@ -30,6 +30,11 @@ export const EXPLORE_NAV: NavItem[] = [
   { href: "/use-cases", labelKey: "nav.useCases", icon: "lightbulb" },
   { href: "/prompts", labelKey: "nav.prompts", icon: "message-square-quote" },
   { href: "/toolbox", labelKey: "nav.toolbox", icon: "briefcase" },
+  // Skills sits here rather than in the primary five for the same reason as
+  // sessions: the five are the constraint that keeps this from reading like an
+  // HR portal, and a skills matrix is something you open when a manager asks
+  // you to, not daily.
+  { href: "/skills", labelKey: "nav.skills", icon: "target" },
   { href: "/passport", labelKey: "nav.passport", icon: "id-card" },
 ];
 

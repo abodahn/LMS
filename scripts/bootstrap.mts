@@ -45,7 +45,7 @@ async function main() {
   // language course imported against a database that had never heard of it and
   // was filed as uncategorised — invisible in a catalogue you browse by
   // category. Upserts, so this costs nothing when there is nothing new.
-  await ensureCategories();
+  await ensureVocabulary();
 
   // Always, not only on a fresh database: an instance deployed without these
   // variables has no administrator, and the operator's fix is to add them and
@@ -54,7 +54,7 @@ async function main() {
   console.log("[bootstrap] done");
 }
 
-async function ensureCategories() {
+async function ensureVocabulary() {
   const { CATEGORIES } = await import("../prisma/seed/courses");
   let added = 0;
   for (const c of CATEGORIES) {
@@ -63,6 +63,60 @@ async function ensureCategories() {
     await prisma.courseCategory.upsert({ where: { key: c.key }, update: c, create: c });
   }
   if (added > 0) console.log(`[bootstrap] ${added} new course category/categories`);
+
+  // Skills and the levels each job expects of them. Upserts, and re-run every
+  // boot for the same reason as the categories: a requirement added after the
+  // first deploy has to reach a database that already exists.
+  const { seedSkills } = await import("../prisma/seed/skills");
+  const counts = await seedSkills(prisma);
+  console.log(`[bootstrap] ${counts.skills} skills, ${counts.requirements} job requirements`);
+
+  await ensurePermissions();
+}
+
+/**
+ * Permissions added after the first deploy.
+ *
+ * Deliberately not seedCore(), which clears every role's permissions and writes
+ * the defaults back. That is right for an empty database and wrong for a
+ * running one: an administrator is allowed to re-map roles, and a deploy must
+ * not quietly undo it.
+ *
+ * So the catalogue is upserted, and a role mapping is written only for a
+ * permission the database has never seen. A brand new permission is one nobody
+ * has had the chance to have an opinion about yet; an existing one is left
+ * exactly as the administrator left it.
+ */
+async function ensurePermissions() {
+  const { PERMISSIONS, ROLE_PERMISSIONS } = await import("../src/lib/rbac");
+
+  const fresh: string[] = [];
+  for (const [key, description] of Object.entries(PERMISSIONS)) {
+    const existing = await prisma.permission.findUnique({ where: { key } });
+    if (!existing) fresh.push(key);
+    await prisma.permission.upsert({
+      where: { key },
+      update: { description, group: key.split(".")[0] },
+      create: { key, description, group: key.split(".")[0] },
+    });
+  }
+  if (fresh.length === 0) return;
+
+  for (const [roleKey, keys] of Object.entries(ROLE_PERMISSIONS)) {
+    const role = await prisma.role.findUnique({ where: { key: roleKey } });
+    if (!role) continue;
+    for (const key of keys) {
+      if (!fresh.includes(key)) continue;
+      const permission = await prisma.permission.findUnique({ where: { key } });
+      if (!permission) continue;
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: role.id, permissionId: permission.id } },
+        update: {},
+        create: { roleId: role.id, permissionId: permission.id },
+      });
+    }
+  }
+  console.log(`[bootstrap] ${fresh.length} new permission(s): ${fresh.join(", ")}`);
 }
 
 async function seedReferenceData() {
@@ -79,6 +133,7 @@ async function seedReferenceData() {
   const { seedAssessments } = await import("../prisma/seed/assessments");
   const { seedPaths } = await import("../prisma/seed/paths");
   const { seedContent } = await import("../prisma/seed/content");
+  const { seedSkills } = await import("../prisma/seed/skills");
 
   const step = async (label: string, fn: () => Promise<unknown>) => {
     const started = Date.now();
@@ -96,6 +151,7 @@ async function seedReferenceData() {
   await step("assessments and question banks", () => seedAssessments(prisma));
   await step("learning paths", () => seedPaths(prisma));
   await step("prompt library and use cases", () => seedContent(prisma));
+  await step("skills and job requirements", () => seedSkills(prisma));
 
 }
 

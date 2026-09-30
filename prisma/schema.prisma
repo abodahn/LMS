@@ -87,6 +87,11 @@ model User {
   sessionsCreated     TrainingSession[]         @relation("SessionAuthor")
   sessionSeats        SessionRegistration[]     @relation("SessionAttendee")
   attendanceMarked    SessionRegistration[]     @relation("AttendanceMarker")
+  skills              UserSkill[]               @relation("SkillHolder")
+  skillsRated         UserSkill[]               @relation("SkillRater")
+  developmentGoals    DevelopmentGoal[]         @relation("GoalOwner")
+  goalsRaised         DevelopmentGoal[]         @relation("GoalAuthor")
+  goalsApproved       DevelopmentGoal[]         @relation("GoalApprover")
 
   @@index([departmentId])
   @@index([managerId])
@@ -170,6 +175,7 @@ model JobTitle {
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
   users        User[]
+  requirements JobTitleSkill[]
 }
 
 model Location {
@@ -552,6 +558,7 @@ model Course {
   prerequisites   CoursePrerequisite[]   @relation("CourseSide")
   requiredBy      CoursePrerequisite[]   @relation("PrerequisiteSide")
   competencies    CourseCompetency[]
+  skills          CourseSkill[]
   departments     CourseDepartment[]
   jobFamilies     CourseJobFamily[]
   goals           CourseGoal[]
@@ -1210,6 +1217,122 @@ model LearningPlan {
 
   user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   path LearningPath? @relation(fields: [pathId], references: [id], onDelete: SetNull)
+}
+
+// ---------------------------------------------------------------------------
+// Skills
+//
+// Deliberately separate from Competency, which measures AI maturity on a 0-100
+// scale from an exam and feeds the recommendation engine. A skill here is
+// operational and observable — line balancing, SMV calculation, machine setup —
+// rated 0 to 5 by someone who watched it done. Forcing one model to carry both
+// would mean compromising assessment scoring to describe a sewing machine.
+// ---------------------------------------------------------------------------
+
+model Skill {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  name        String
+  nameAr      String?
+  nameTr      String?
+  description String?
+  /// PRODUCTION | QUALITY | TECHNICAL | DIGITAL | LEADERSHIP | COMPLIANCE | LANGUAGE
+  category    String  @default("PRODUCTION")
+  /// Which job families this skill is normally relevant to, comma separated.
+  jobFamilies String  @default("")
+  order       Int     @default(0)
+  isActive    Boolean @default(true)
+
+  requirements JobTitleSkill[]
+  holders      UserSkill[]
+  courses      CourseSkill[]
+  goals        DevelopmentGoal[]
+
+  @@index([category])
+}
+
+/// What a job title expects. The gap is this minus UserSkill.level.
+model JobTitleSkill {
+  id            String @id @default(cuid())
+  jobTitleId    String
+  skillId       String
+  /// 0-5. The level someone in this job is expected to reach.
+  requiredLevel Int    @default(3)
+  /// A critical skill gap is reported separately: it blocks the job, not just improves it.
+  isCritical    Boolean @default(false)
+
+  jobTitle JobTitle @relation(fields: [jobTitleId], references: [id], onDelete: Cascade)
+  skill    Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([jobTitleId, skillId])
+  @@index([skillId])
+}
+
+/// What an employee actually has, and who says so.
+model UserSkill {
+  id      String @id @default(cuid())
+  userId  String
+  skillId String
+  /// 0 none, 1 aware, 2 assisted, 3 independent, 4 proficient, 5 can teach it.
+  level   Int    @default(0)
+  /// SELF | MANAGER | ASSESSMENT | COURSE — where this rating came from, so a
+  /// self-assessment is never mistaken for an observed one.
+  source  String @default("SELF")
+  note    String?
+
+  ratedById String?
+  ratedAt   DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User  @relation("SkillHolder", fields: [userId], references: [id], onDelete: Cascade)
+  ratedBy User? @relation("SkillRater", fields: [ratedById], references: [id], onDelete: SetNull)
+  skill   Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId])
+  @@index([skillId])
+}
+
+/// Which skills a course actually develops, and how far it takes someone.
+model CourseSkill {
+  id          String @id @default(cuid())
+  courseId    String
+  skillId     String
+  /// The level this course can realistically get someone to.
+  targetLevel Int    @default(3)
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  skill  Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, skillId])
+  @@index([skillId])
+}
+
+/// One line of an individual development plan: a gap, a date, and who agreed to it.
+model DevelopmentGoal {
+  id          String    @id @default(cuid())
+  userId      String
+  skillId     String
+  fromLevel   Int
+  targetLevel Int
+  targetDate  DateTime?
+  /// PROPOSED | APPROVED | DONE | DROPPED
+  status      String    @default("PROPOSED")
+  note        String?
+
+  createdById String?
+  approvedById String?
+  approvedAt   DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user       User  @relation("GoalOwner", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy  User? @relation("GoalAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedBy User? @relation("GoalApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  skill      Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skillId])
+  @@index([status])
 }
 
 // ---------------------------------------------------------------------------

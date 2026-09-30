@@ -10,6 +10,9 @@ import { Card, Progress, SectionHeading, StatusPill } from "@/components/ui/prim
 import { LevelChip } from "@/components/level-chip";
 import { BeforeAfter } from "@/components/before-after";
 import { MemberActions } from "./member-actions";
+import { PlanPanel, RateControl } from "./skill-panel";
+import { SkillMatrix } from "@/components/skill-matrix";
+import { skillProfile, coursesForSkill } from "@/lib/skills";
 
 export const metadata: Metadata = { title: "Team member" };
 
@@ -45,6 +48,33 @@ export default async function TeamMemberPage({ params }: PageProps<"/team/[userI
       select: { id: true, title: true, estimatedHours: true },
     }),
   ]);
+
+  // The skills spine: what the job requires, what this person holds, and the
+  // plan between the two.
+  const profile = await skillProfile(userId);
+  const goalRows = await prisma.developmentGoal.findMany({
+    where: { userId, status: { not: "DROPPED" } },
+    include: { skill: true },
+    orderBy: [{ status: "asc" }, { createdAt: "asc" }],
+  });
+  const goals = await Promise.all(
+    goalRows.map(async (g) => ({
+      id: g.id,
+      skillName: localized(g.skill, "name", locale),
+      fromLevel: g.fromLevel,
+      targetLevel: g.targetLevel,
+      targetDate: g.targetDate ? g.targetDate.toISOString().slice(0, 10) : null,
+      status: g.status,
+      // The employee's language, not the manager's: they are the one who has to
+      // sit through it.
+      courses: (await coursesForSkill(g.skillId, g.targetLevel, member.preferredLanguage)).map((c) => ({
+        id: c.id,
+        slug: c.slug,
+        title: localized(c, "title", locale),
+        hours: formatHours(c.estimatedHours),
+      })),
+    })),
+  );
 
   const baseline = attempts.find((a) => a.isBaseline) ?? attempts[0];
   const latest = attempts.at(-1);
@@ -180,6 +210,15 @@ export default async function TeamMemberPage({ params }: PageProps<"/team/[userI
           )}
         </ul>
       </Card>
+
+      <SkillMatrix
+        profile={profile}
+        dict={dict}
+        locale={locale}
+        renderAction={(gap) => <RateControl userId={member.id} skillId={gap.skillId} level={gap.held} />}
+      />
+
+      <PlanPanel userId={member.id} goals={goals} hasGaps={profile.gaps.length > 0} />
 
       <MemberActions
         userId={member.id}
