@@ -49,8 +49,21 @@ function catalogueFiles(): string[] {
  */
 const CHUNK = 400;
 
+/**
+ * Rows a file may hold and still be imported without being asked for.
+ *
+ * Importing the full Microsoft catalogue unattended took the site down, so that
+ * now waits for LOAD_CATALOGUE=on. But blanket-disabling the import meant a
+ * later 98-row addition never landed either, which is its own kind of broken: a
+ * small file costs seconds and cannot destabilise anything.
+ */
+const AUTO_IMPORT_LIMIT = 500;
+
 /** Prefixes owned by the shipped files, so counting excludes seeded courses. */
-const PREFIXES = ["YT-", "PF-", "MSL-"];
+// Every code prefix the shipped files use. A prefix missing here makes those
+// rows invisible to the count, so the file looks unimported and is re-imported
+// on every single boot — which is exactly what LNG- did.
+const PREFIXES = ["YT-", "PF-", "MSL-", "LNG-"];
 
 let running = false;
 
@@ -76,23 +89,38 @@ export async function ensureCatalogue(): Promise<{ imported: number; skipped: bo
     const present = catalogueFiles().filter((f) => existsSync(f));
     if (present.length === 0) return { imported: 0, skipped: true };
 
-    const expected = present.reduce((sum, f) => sum + countRows(f), 0);
+    const all = present.map((path) => ({ path, rows: countRows(path) }));
+    const everything = process.env.LOAD_CATALOGUE === "on";
+    const eligible = everything ? all : all.filter((f) => f.rows <= AUTO_IMPORT_LIMIT);
+    const deferred = all.length - eligible.length;
+
+    const expected = eligible.reduce((sum, f) => sum + f.rows, 0);
     const loaded = await prisma.course.count({
       where: { OR: PREFIXES.map((p) => ({ code: { startsWith: p } })) },
     });
 
+    if (deferred > 0) {
+      console.log(
+        `[catalogue] ${deferred} large file(s) held back — set LOAD_CATALOGUE=on to import them`,
+      );
+    }
+
+    if (eligible.length === 0) return { imported: 0, skipped: true };
+
+    // Counted across every eligible file, so a small addition alongside files
+    // already loaded still registers as short and gets imported.
     if (loaded >= expected) {
-      console.log(`[catalogue] complete — ${loaded} imported courses`);
+      console.log(`[catalogue] nothing new to import — ${loaded} courses from files`);
       return { imported: 0, skipped: true };
     }
 
-    console.log(`[catalogue] ${loaded} of ${expected} loaded — importing in the background`);
+    console.log(`[catalogue] importing in the background`);
 
     const { parseCsv } = await import("./import/parse");
     const { validateCourseRows, commitCourseImport } = await import("./import/courses");
     let imported = 0;
 
-    for (const path of present) {
+    for (const { path } of eligible) {
       const started = Date.now();
       let created = 0;
       let updated = 0;
