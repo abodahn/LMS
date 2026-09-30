@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { prisma } from "./db";
 
 /**
@@ -6,39 +6,77 @@ import { prisma } from "./db";
  *
  * This used to run in the container's start command, before the port opened.
  * That was fine at 1,100 courses and is not fine at ten thousand: the platform
- * would sit dark for ten minutes on a first deploy while an import ran, and a
- * host watching for the port would give up and call the deploy failed.
+ * would sit dark for minutes on a first deploy while an import ran, and a host
+ * watching for the port would give up and call the deploy failed.
  *
- * So the boot path now does only what must happen before anyone can use the
- * system — migrations, reference data, the first administrator — and the
- * catalogue fills in behind a working site. An instance is usable within
- * seconds with the seeded courses, and complete a few minutes later.
+ * So the boot path does only what must happen before anyone can use the system
+ * — migrations, reference data, the first administrator — and the catalogue
+ * fills in behind a working site.
  *
- * Idempotent and self-repairing: it compares what is loaded against what the
- * files hold and imports only when short, so a restart costs one count query.
+ * **Memory is the constraint here, not time.** The instance this runs on has
+ * 512MB. Validating a whole file builds a preview holding both the raw and the
+ * parsed copy of every row, and `commitCourseImport` validates its input a
+ * second time, so a ten-thousand-row file at once costs several times the
+ * file's own size. Exceeding that kills the container, which restarts and
+ * begins the import again from nothing — a loop that never completes and takes
+ * the site down with it. Hence: one file open at a time, and small batches.
+ *
+ * Idempotent and self-repairing. It compares what is loaded against what the
+ * files hold and imports only when short, so an ordinary restart costs one
+ * count query, and a restart mid-import resumes from what already landed.
  */
 
-const FILES = ["data/catalog.csv", "data/catalog-mslearn.csv"];
+/**
+ * Every catalogue file in the build, discovered rather than listed. The
+ * Microsoft harvest writes itself out in numbered parts and the number of them
+ * changes whenever it is re-run, so a hard-coded list goes stale silently — as
+ * it did once, leaving eight thousand courses on disk and unimported.
+ */
+function catalogueFiles(): string[] {
+  try {
+    return readdirSync("data")
+      .filter((f) => f.startsWith("catalog") && f.endsWith(".csv"))
+      .sort()
+      .map((f) => `data/${f}`);
+  } catch {
+    return [];
+  }
+}
 
-/** Prefixes owned by the shipped files, so counting does not include seeded courses. */
+/**
+ * Rows per batch. Small enough that peak memory stays a few megabytes, large
+ * enough that reloading providers and categories per batch stays amortised.
+ */
+const CHUNK = 400;
+
+/** Prefixes owned by the shipped files, so counting excludes seeded courses. */
 const PREFIXES = ["YT-", "PF-", "MSL-"];
 
 let running = false;
+
+/** Data rows in a CSV, without parsing it — used only to decide whether to import. */
+function countRows(path: string): number {
+  const text = readFileSync(path, "utf8");
+  let rows = 0;
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') inQuotes = !inQuotes;
+    else if (ch === "\n" && !inQuotes) rows++;
+  }
+  // Minus the header, and tolerant of a missing trailing newline.
+  return Math.max(0, rows - 1 + (text.endsWith("\n") ? 0 : 1));
+}
 
 export async function ensureCatalogue(): Promise<{ imported: number; skipped: boolean }> {
   if (running) return { imported: 0, skipped: true };
   running = true;
 
   try {
-    const present = FILES.filter((f) => existsSync(f));
+    const present = catalogueFiles().filter((f) => existsSync(f));
     if (present.length === 0) return { imported: 0, skipped: true };
 
-    const { parseCsv } = await import("./import/parse");
-    const { validateCourseRows, commitCourseImport } = await import("./import/courses");
-
-    const files = present.map((path) => ({ path, ...parseCsv(readFileSync(path, "utf8")) }));
-    const expected = files.reduce((sum, f) => sum + f.rows.length, 0);
-
+    const expected = present.reduce((sum, f) => sum + countRows(f), 0);
     const loaded = await prisma.course.count({
       where: { OR: PREFIXES.map((p) => ({ code: { startsWith: p } })) },
     });
@@ -49,17 +87,32 @@ export async function ensureCatalogue(): Promise<{ imported: number; skipped: bo
     }
 
     console.log(`[catalogue] ${loaded} of ${expected} loaded — importing in the background`);
+
+    const { parseCsv } = await import("./import/parse");
+    const { validateCourseRows, commitCourseImport } = await import("./import/courses");
     let imported = 0;
 
-    for (const file of files) {
+    for (const path of present) {
       const started = Date.now();
-      const preview = await validateCourseRows(file.headers, file.rows);
-      const result = await commitCourseImport(preview, { trustLinks: true });
-      imported += result.created;
+      let created = 0;
+      let updated = 0;
+
+      // Parsed inside the loop so only one file is ever held.
+      const { headers, rows } = parseCsv(readFileSync(path, "utf8"));
+
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const preview = await validateCourseRows(headers, rows.slice(i, i + CHUNK));
+        const result = await commitCourseImport(preview, { trustLinks: true });
+        created += result.created;
+        updated += result.updated;
+
+        // Yield, so importing never starves a request.
+        await new Promise((r) => setTimeout(r, 250));
+      }
+
+      imported += created;
       console.log(
-        `[catalogue] ${file.path}: +${result.created} new, ${result.updated} updated (${Math.round(
-          (Date.now() - started) / 1000,
-        )}s)`,
+        `[catalogue] ${path}: +${created} new, ${updated} updated (${Math.round((Date.now() - started) / 1000)}s)`,
       );
     }
 

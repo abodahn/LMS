@@ -217,15 +217,23 @@ async function main() {
     }
   }
 
-  const csv = [
-    COURSE_IMPORT_COLUMNS.join(","),
-    ...rows.map((r) =>
-      COURSE_IMPORT_COLUMNS.map((c) => `"${String(r[c] ?? "").replace(/"/g, '""')}"`).join(","),
-    ),
-  ].join("\n");
-
+  // Written in parts rather than as one file. The importer holds a whole
+  // file's parsed rows while it works through it, and ten thousand of those is
+  // more than a 512MB container can carry alongside the application itself.
+  const PART = 2000;
   mkdirSync("data", { recursive: true });
-  writeFileSync("data/catalog-mslearn.csv", "﻿" + csv, "utf8");
+
+  for (let i = 0, part = 1; i < rows.length; i += PART, part++) {
+    const csv = [
+      COURSE_IMPORT_COLUMNS.join(","),
+      ...rows
+        .slice(i, i + PART)
+        .map((r) =>
+          COURSE_IMPORT_COLUMNS.map((c) => `"${String(r[c] ?? "").replace(/"/g, '""')}"`).join(","),
+        ),
+    ].join("\n");
+    writeFileSync(`data/catalog-mslearn-${String(part).padStart(2, "0")}.csv`, "﻿" + csv, "utf8");
+  }
 
   const byLang = new Map<string, number>();
   const byCat = new Map<string, number>();
@@ -234,7 +242,7 @@ async function main() {
     byCat.set(r.Category, (byCat.get(r.Category) ?? 0) + 1);
   }
 
-  console.log(`\nwrote data/catalog-mslearn.csv: ${rows.length} courses`);
+  console.log(`\nwrote ${Math.ceil(rows.length / 2000)} parts under data/: ${rows.length} courses`);
   console.log("  " + [...byLang].map(([l, n]) => `${l}=${n}`).join("  "));
   console.log("  " + [...byCat].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c}=${n}`).join("  "));
   console.log(`  ${skipped} items skipped as not relevant to T&C`);
