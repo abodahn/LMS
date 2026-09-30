@@ -7,7 +7,7 @@ import { ensureVideoLesson } from "./lessons";
 import type { ParsedRow } from "../spreadsheet";
 import { slugify } from "../utils";
 import { COMPETENCY_KEYS, JOB_FAMILIES, LEARNING_GOALS, LOCALES } from "../constants";
-import { list, matchDifficulty, matchEnum, matchLevel, norm, parseHours, truthy, uniqueSlug } from "./parse";
+import { list, matchDifficulty, matchEnum, matchLevel, norm, parseHours, parseWeighted, truthy, uniqueSlug } from "./parse";
 
 /**
  * Bulk course import.
@@ -393,13 +393,19 @@ export async function commitCourseImport(preview: CourseImportPreview, options: 
     if (existing) updated++;
     else created++;
 
-    const comp = matchEnum(list(d.competencies), COMPETENCY_KEYS).ok;
+    const weighted = parseWeighted(d.competencies);
+    const comp = matchEnum(weighted.map((w) => w.key), COMPETENCY_KEYS).ok;
     await prisma.courseCompetency.deleteMany({ where: { courseId: course.id } });
     for (const key of comp) {
       const competency = await prisma.competency.findUnique({ where: { key } });
       if (competency) {
         await prisma.courseCompetency.create({
-          data: { courseId: course.id, competencyId: competency.id, weight: 3 },
+          data: {
+            courseId: course.id,
+            competencyId: competency.id,
+            // The weight the file asked for, not a fixed 3.
+            weight: weighted.find((w) => norm(w.key) === norm(key))?.weight ?? 3,
+          },
         });
       }
     }

@@ -53,7 +53,14 @@ export default async function AdminCoursesPage({ searchParams }: PageProps<"/adm
   };
 
   const [providers, total, courses] = await Promise.all([
-    prisma.courseProvider.findMany({ orderBy: { name: "asc" } }),
+    // Only providers that carry something, biggest first: 958 exist and most
+    // hold a single video, which makes an alphabetical select of all of them
+    // useless for finding anything.
+    prisma.courseProvider.findMany({
+      where: { courses: { some: {} } },
+      select: { id: true, name: true, _count: { select: { courses: true } } },
+      orderBy: { name: "asc" },
+    }),
     prisma.course.count({ where }),
     prisma.course.findMany({
       where,
@@ -118,7 +125,10 @@ export default async function AdminCoursesPage({ searchParams }: PageProps<"/adm
             name: "provider",
             label: t("form.provider"),
             value: provider,
-            options: providers.map((p) => ({ value: p.id, label: p.name })),
+            options: providers
+              .slice()
+              .sort((a, b) => b._count.courses - a._count.courses)
+              .map((p) => ({ value: p.id, label: `${p.name} (${p._count.courses})` })),
           },
           {
             name: "review",

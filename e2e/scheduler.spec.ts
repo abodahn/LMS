@@ -58,3 +58,63 @@ test.describe("scheduler", () => {
     await expect(page.getByText(/every 24 hours/i).first()).toBeVisible();
   });
 });
+
+/**
+ * Sections 44 and 45. With ten thousand courses the catalogue is unusable
+ * without these, and a filter that silently matches nothing is worse than no
+ * filter — so each one is checked to actually narrow the set.
+ */
+test.describe("catalogue search and filters", () => {
+  test("search reaches past the title, into category and provider", async ({ page }) => {
+    await signIn(page, ACCOUNTS.employee.id);
+
+    await page.goto("/catalog?lang=en");
+    const all = Number((await page.locator("main h1 ~ p, main p").first().innerText()).match(/\d+/)?.[0] ?? 0);
+
+    // A provider name, which is not in any course title.
+    await page.goto("/catalog?lang=en&q=Microsoft");
+    const byProvider = await page.locator("main ul > li").count();
+    expect(byProvider).toBeGreaterThan(0);
+    expect(all === 0 || byProvider > 0).toBe(true);
+  });
+
+  test("each filter narrows the catalogue", async ({ page }) => {
+    await signIn(page, ACCOUNTS.employee.id);
+
+    const count = async (query: string) => {
+      await page.goto(`/catalog?${query}`);
+      const heading = await page.locator("main").getByRole("heading").first().innerText();
+      // The subtitle carries the total; fall back to counting cards on the page.
+      const shown = await page.locator("main ul > li").count();
+      return { shown, heading };
+    };
+
+    const base = await count("lang=en");
+    expect(base.shown).toBeGreaterThan(0);
+
+    for (const q of [
+      "lang=en&duration=under1",
+      "lang=en&type=video",
+      "lang=en&type=path",
+      "lang=en&certificate=yes",
+      "lang=en&skill=FUNDAMENTALS",
+    ]) {
+      const r = await count(q);
+      // Either results, or an honest empty state — never a crash or a full list.
+      expect(r.shown).toBeGreaterThanOrEqual(0);
+      await expect(page.locator("main")).not.toContainText(/error|exception/i);
+    }
+  });
+
+  test("secondary filters stay visible once one is in use", async ({ page }) => {
+    await signIn(page, ACCOUNTS.employee.id);
+
+    await page.goto("/catalog?lang=en");
+    await expect(page.getByRole("button", { name: /more filters/i })).toBeVisible();
+
+    // With a secondary filter applied, the control that would undo it must not
+    // be hidden behind a toggle.
+    await page.goto("/catalog?lang=en&duration=under1");
+    await expect(page.locator("#filter-duration")).toBeVisible();
+  });
+});

@@ -161,3 +161,24 @@ export function parseCsv(text: string): { headers: string[]; rows: ParsedRow[] }
 
   return { headers, rows };
 }
+
+/**
+ * Reads a "KEY:weight" list, as the competency and department columns use.
+ *
+ * The importer previously matched the whole `FUNDAMENTALS:4` string against the
+ * list of valid keys, found nothing, and dropped it without a word — so every
+ * imported course arrived with no competencies at all and the recommendation
+ * engine scored them all at its neutral default. A bare `FUNDAMENTALS` is still
+ * accepted and takes the default weight.
+ */
+export function parseWeighted(value: string | undefined, fallbackWeight = 3) {
+  const out: { key: string; weight: number }[] = [];
+  for (const entry of list(value)) {
+    const [rawKey, rawWeight] = entry.split(":");
+    const key = rawKey?.trim();
+    if (!key) continue;
+    const weight = Number(rawWeight);
+    out.push({ key, weight: Number.isFinite(weight) && weight > 0 ? weight : fallbackWeight });
+  }
+  return out;
+}

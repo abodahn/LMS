@@ -1,11 +1,18 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useTransition } from "react";
-import { Search, X } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Search, X, SlidersHorizontal } from "lucide-react";
 import { useT } from "./i18n-provider";
 
-type Filter = { name: string; label: string; value: string; options: { value: string; label: string }[] };
+type Filter = {
+  name: string;
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  /** Kept behind "More filters" until wanted, or until one is in use. */
+  secondary?: boolean;
+};
 
 /**
  * Filtering happens on the server through the query string: the page stays
@@ -23,6 +30,13 @@ export function FilterBar({
   const pathname = usePathname();
   const params = useSearchParams();
   const [pending, start] = useTransition();
+  const [showAll, setShowAll] = useState(false);
+
+  // A filter already in use is never hidden — otherwise a result set looks
+  // unexplained, and the control that would undo it is out of sight.
+  const secondaryInUse = filters.some((f) => f.secondary && f.value);
+  const visible = filters.filter((f) => !f.secondary || showAll || secondaryInUse);
+  const hidden = filters.filter((f) => f.secondary).length;
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params.toString());
@@ -65,7 +79,7 @@ export function FilterBar({
         </form>
       ) : null}
 
-      {filters.map((f) => (
+      {visible.map((f) => (
         <div key={f.name} className="min-w-40">
           <label className="label" htmlFor={`filter-${f.name}`}>
             {f.label}
@@ -86,6 +100,18 @@ export function FilterBar({
           </select>
         </div>
       ))}
+
+      {hidden > 0 && !secondaryInUse ? (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="inline-flex h-10 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--brand-line)] px-3 text-[13px] font-medium text-[var(--brand-ink)] hover:bg-[var(--brand-canvas)]"
+          aria-expanded={showAll}
+        >
+          <SlidersHorizontal size={14} aria-hidden />
+          {showAll ? t("common.fewerFilters") : t("common.moreFilters")}
+        </button>
+      ) : null}
 
       {hasAny ? (
         <button

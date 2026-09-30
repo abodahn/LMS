@@ -16,6 +16,7 @@ import { LinkButton } from "@/components/ui/button";
 import { FilterBar } from "@/components/filter-bar";
 import { Pagination } from "@/components/pagination";
 import { EnrollButton } from "./enroll-button";
+import { JOB_FAMILIES } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "Course Catalog" };
 
@@ -34,7 +35,32 @@ export default async function CatalogPage({
   const cost = typeof params.cost === "string" ? params.cost : "";
   const category = typeof params.category === "string" ? params.category : "";
   const lang = typeof params.lang === "string" ? params.lang : "";
+  const duration = typeof params.duration === "string" ? params.duration : "";
+  const provider = typeof params.provider === "string" ? params.provider : "";
+  const certificate = typeof params.certificate === "string" ? params.certificate : "";
+  const skill = typeof params.skill === "string" ? params.skill : "";
+  const role = typeof params.role === "string" ? params.role : "";
+  const type = typeof params.type === "string" ? params.type : "";
   const page = Math.max(1, Number(params.page ?? 1) || 1);
+
+  // Bands rather than a slider: nobody filters a catalogue by "between 3.5 and
+  // 4.25 hours", they filter by whether it fits in a break or a morning.
+  const DURATION: Record<string, { gte?: number; lt?: number }> = {
+    under1: { lt: 1 },
+    "1to4": { gte: 1, lt: 4 },
+    "4to10": { gte: 4, lt: 10 },
+    over10: { gte: 10 },
+  };
+
+  // Course type is read from the platform string, which is where the shape of a
+  // resource actually lives today — a dedicated column belongs with the content
+  // types in a later phase.
+  const TYPE: Record<string, object> = {
+    internal: { isInternal: true },
+    path: { platform: { contains: "learning path" } },
+    video: { platform: { contains: "YouTube" } },
+    course: { isInternal: false, NOT: [{ platform: { contains: "YouTube" } }, { platform: { contains: "learning path" } }] },
+  };
 
   const where = {
     status: "PUBLISHED",
@@ -46,6 +72,12 @@ export default async function CatalogPage({
       : cost === "paid"
         ? { isFree: false }
         : {}),
+    ...(certificate === "yes" ? { certificateAvailable: true } : {}),
+    ...(provider ? { providerId: provider } : {}),
+    ...(duration && DURATION[duration] ? { estimatedHours: DURATION[duration] } : {}),
+    ...(type && TYPE[type] ? TYPE[type] : {}),
+    ...(skill ? { competencies: { some: { competency: { key: skill } } } } : {}),
+    ...(role ? { jobFamilies: { some: { jobFamily: role } } } : {}),
     // Each of these needs its own OR, and sibling ORs in one where-object
     // overwrite each other — so they go in as separate AND clauses.
     AND: [
@@ -82,6 +114,13 @@ export default async function CatalogPage({
                 { descriptionAr: { contains: q } },
                 { descriptionTr: { contains: q } },
                 { provider: { name: { contains: q } } },
+                { code: { contains: q } },
+                { platform: { contains: q } },
+                // Section 44: a search for "finance" should find the category,
+                // and one for "prompting" should find the skill.
+                { category: { name: { contains: q } } },
+                { competencies: { some: { competency: { name: { contains: q } } } } },
+                { jobFamilies: { some: { jobFamily: { contains: q } } } },
               ],
             },
           ]
@@ -89,9 +128,17 @@ export default async function CatalogPage({
     ],
   };
 
-  const [levels, categories, total, courses, enrollments] = await Promise.all([
+  const [levels, categories, competencies, providers, total, courses, enrollments] = await Promise.all([
     prisma.skillLevel.findMany({ orderBy: { order: "asc" } }),
     prisma.courseCategory.findMany({ orderBy: { order: "asc" } }),
+    prisma.competency.findMany({ orderBy: { order: "asc" } }),
+    // 958 providers exist and most carry a single YouTube video; a select of
+    // everything would be unusable. Only those with a real body of content.
+    prisma.courseProvider.findMany({
+      where: { courses: { some: {} } },
+      select: { id: true, name: true, _count: { select: { courses: true } } },
+      orderBy: { name: "asc" },
+    }),
     prisma.course.count({ where }),
     prisma.course.findMany({
       where,
@@ -157,6 +204,63 @@ export default async function CatalogPage({
               { value: "noapproval", label: t("common.noApproval") },
               { value: "paid", label: t("common.paid") },
             ],
+          },
+          {
+            name: "duration",
+            label: t("common.duration"),
+            value: duration,
+            secondary: true,
+            options: [
+              { value: "under1", label: t("common.under1") },
+              { value: "1to4", label: t("common.1to4") },
+              { value: "4to10", label: t("common.4to10") },
+              { value: "over10", label: t("common.over10") },
+            ],
+          },
+          {
+            name: "type",
+            label: t("common.courseType"),
+            value: type,
+            secondary: true,
+            options: [
+              { value: "internal", label: t("common.typeInternal") },
+              { value: "course", label: t("common.typeCourse") },
+              { value: "path", label: t("common.typePath") },
+              { value: "video", label: t("common.typeVideo") },
+            ],
+          },
+          {
+            name: "skill",
+            label: t("common.skill"),
+            value: skill,
+            secondary: true,
+            options: competencies.map((c) => ({ value: c.key, label: localized(c, "name", locale) })),
+          },
+          {
+            name: "role",
+            label: t("common.jobRole"),
+            value: role,
+            secondary: true,
+            options: JOB_FAMILIES.map((f) => ({ value: f, label: t(`jobFamily.${f}`) })),
+          },
+          {
+            name: "provider",
+            label: t("common.provider"),
+            value: provider,
+            secondary: true,
+            // Ordered by how much each carries, so the meaningful ones are not
+            // buried under hundreds of single-video channels.
+            options: providers
+              .slice()
+              .sort((a, b) => b._count.courses - a._count.courses)
+              .map((p) => ({ value: p.id, label: `${p.name} (${p._count.courses})` })),
+          },
+          {
+            name: "certificate",
+            label: t("common.certificate"),
+            value: certificate,
+            secondary: true,
+            options: [{ value: "yes", label: t("common.withCertificate") }],
           },
         ]}
       />

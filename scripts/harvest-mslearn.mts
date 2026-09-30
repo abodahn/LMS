@@ -116,6 +116,39 @@ const CATEGORY_COMPETENCY: Record<string, string> = {
   TECHNICAL: "TECHNICAL:5",
 };
 
+/**
+ * Which part of the business a subject belongs to.
+ *
+ * The engine matches courses to people by job family, and without this every
+ * imported course was general-audience — so a supply-chain module never
+ * reached anyone in supply chain. Subject is a better signal than Microsoft's
+ * own role list, which describes IT job titles rather than a garment factory.
+ */
+const SUBJECT_JOB_FAMILY: Record<string, string> = {
+  "supply-chain-management": "SUPPLY_CHAIN",
+  "inventory-management": "SUPPLY_CHAIN",
+  "finance-accounting": "FINANCE",
+  "manufacturing-processes": "PRODUCTION",
+  "product-lifecycle-management": "PRODUCTION",
+  "asset-management": "PRODUCTION",
+  "field-management": "PRODUCTION",
+  "employee-engagement": "HR",
+  "employee-management": "HR",
+  "marketing-sales": "SALES_MARKETING",
+  "customer-relationship-management": "SALES_MARKETING",
+  "change-management": "MANAGEMENT",
+  "knowledge-management": "MANAGEMENT",
+  "app-development": "IT",
+  devops: "IT",
+  "cloud-computing": "IT",
+  "it-management-monitoring": "IT",
+  databases: "IT",
+  "data-integration": "IT",
+  security: "IT",
+  "identity-access": "IT",
+  "threat-protection": "IT",
+};
+
 /** Roles that mean "written for an engineer". */
 const TECHNICAL_ROLES = new Set([
   "developer",
@@ -145,6 +178,14 @@ const categoryOf = (item: Item): string | null => {
     if (SUBJECT_CATEGORY[subject]) return SUBJECT_CATEGORY[subject];
   }
   return null;
+};
+
+const jobFamilyOf = (item: Item): string => {
+  for (const subject of item.subjects ?? []) {
+    if (SUBJECT_JOB_FAMILY[subject]) return SUBJECT_JOB_FAMILY[subject];
+  }
+  // Everything else genuinely is for anyone: Excel, Teams, the AI material.
+  return "GENERAL";
 };
 
 async function fetchCatalog(locale: Locale): Promise<Catalog> {
@@ -212,6 +253,7 @@ async function main() {
         Certificate: "no",
         Category: category,
         Competencies: CATEGORY_COMPETENCY[category] ?? "",
+        "Job Families": jobFamilyOf(item),
         Technical: isTechnical ? "yes" : "no",
       });
     }

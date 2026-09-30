@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { list, matchDifficulty, matchLevel, parseHours, uniqueSlug } from "../src/lib/import/parse";
+import { list, matchDifficulty, matchLevel, parseHours, parseWeighted, uniqueSlug } from "../src/lib/import/parse";
 
 /**
  * Duration is the field a bulk import most often mangles, and it feeds path
@@ -95,5 +95,31 @@ describe("uniqueSlug", () => {
     const own = uniqueSlug("Intro to AI", "YT-abcdefghijk", new Set());
     const again = uniqueSlug("Intro to AI", "YT-abcdefghijk", new Set([own]), own);
     expect(again).toBe(own);
+  });
+});
+
+describe("parseWeighted", () => {
+  it("reads a key with its weight", () => {
+    expect(parseWeighted("FUNDAMENTALS:4")).toEqual([{ key: "FUNDAMENTALS", weight: 4 }]);
+    expect(parseWeighted("FUNDAMENTALS:2,WORKPLACE:3")).toEqual([
+      { key: "FUNDAMENTALS", weight: 2 },
+      { key: "WORKPLACE", weight: 3 },
+    ]);
+  });
+
+  it("accepts a bare key, which is what most files carry", () => {
+    expect(parseWeighted("WORKPLACE")).toEqual([{ key: "WORKPLACE", weight: 3 }]);
+  });
+
+  it("falls back rather than writing a nonsense weight", () => {
+    expect(parseWeighted("WORKPLACE:abc")).toEqual([{ key: "WORKPLACE", weight: 3 }]);
+    expect(parseWeighted("WORKPLACE:0")).toEqual([{ key: "WORKPLACE", weight: 3 }]);
+    expect(parseWeighted("WORKPLACE:-2")).toEqual([{ key: "WORKPLACE", weight: 3 }]);
+  });
+
+  it("ignores empties instead of creating blank keys", () => {
+    expect(parseWeighted("")).toEqual([]);
+    expect(parseWeighted(undefined)).toEqual([]);
+    expect(parseWeighted("FUNDAMENTALS,,WORKPLACE")).toHaveLength(2);
   });
 });
