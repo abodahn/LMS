@@ -19,13 +19,15 @@ export function formatMinutes(minutes: number): string {
   return formatHours(minutes / 60);
 }
 
-export function formatDate(value: Date | string | null | undefined, locale = "en") {
+/** `timeZone: "UTC"` for values that are whole UTC days, such as challenge windows. */
+export function formatDate(value: Date | string | null | undefined, locale = "en", timeZone?: string) {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
   return new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : locale === "tr" ? "tr-TR" : "en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
+    timeZone,
   }).format(d);
 }
 

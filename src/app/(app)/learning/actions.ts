@@ -101,6 +101,8 @@ export async function saveLessonProgressAction(input: z.infer<typeof lessonSchem
       },
     });
 
+    // Kept for the activity history; points count lessons from LessonProgress,
+    // where un-ticking and re-ticking a lesson is still one lesson.
     await recordActivity(user.id, (parsed.data.secondsSpent ?? 0) / 60, !wasComplete && nowComplete ? 1 : 0);
     const updated = await recalcEnrollmentProgress(enrollment.id);
 

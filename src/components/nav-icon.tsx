@@ -1,4 +1,5 @@
 import {
+  Trophy,
   Award,
   BarChart3,
   Briefcase,
@@ -54,6 +55,7 @@ const ICONS = {
   calendar: Calendar,
   "calendar-days": CalendarDays,
   cpu: Cpu,
+  trophy: Trophy,
 } as const;
 
 export type IconName = keyof typeof ICONS;

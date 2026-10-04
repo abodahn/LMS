@@ -14,6 +14,7 @@ export const PERMISSIONS = {
   "team.review": "Review team capstone submissions",
   "team.assess": "Rate a team member's skills and agree a development plan",
   "succession.view": "View succession readiness for critical roles",
+  "engagement.manage": "Create and run team and department challenges",
   // people admin
   "users.view": "View all employees",
   "users.manage": "Create, edit, deactivate employees",
@@ -62,6 +63,7 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
     "team.assess",
     "users.view",
     "succession.view",
+    "engagement.manage",
     "users.manage",
     "users.import",
     "org.manage",

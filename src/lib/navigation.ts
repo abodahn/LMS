@@ -36,6 +36,7 @@ export const EXPLORE_NAV: NavItem[] = [
   // you to, not daily.
   { href: "/skills", labelKey: "nav.skills", icon: "target" },
   { href: "/career", labelKey: "nav.career", icon: "route" },
+  { href: "/challenges", labelKey: "nav.challenges", icon: "trophy" },
   { href: "/calendar", labelKey: "nav.calendar", icon: "calendar" },
   { href: "/passport", labelKey: "nav.passport", icon: "id-card" },
 ];
@@ -62,6 +63,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/content", labelKey: "admin.content", icon: "lightbulb", permission: "content.manage" },
   { href: "/admin/opportunities", labelKey: "admin.opportunities", icon: "target", permission: "opportunities.manage" },
   { href: "/admin/succession", labelKey: "admin.succession", icon: "users", permission: "succession.view" },
+  { href: "/admin/challenges", labelKey: "admin.challenges", icon: "trophy", permission: "engagement.manage" },
   { href: "/admin/ai", labelKey: "admin.aiUsage", icon: "cpu", permission: "analytics.executive" },
   { href: "/admin/settings", labelKey: "admin.settings", icon: "settings", permission: "settings.manage" },
   { href: "/admin/audit", labelKey: "admin.audit", icon: "scroll-text", permission: "audit.view" },

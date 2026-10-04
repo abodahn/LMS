@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/locale";
 import { translate, localized } from "@/lib/i18n";
 import { getLearnerSnapshot, nextBestAction } from "@/lib/learner";
+import { myProgress } from "@/lib/engagement";
 import { formatDate, formatHours, greetingKey } from "@/lib/utils";
 import { LinkButton } from "@/components/ui/button";
 import { Card, CardHeader, Progress, StatCard } from "@/components/ui/primitives";
@@ -15,7 +16,7 @@ export default async function DashboardPage() {
   const { dict, locale } = await getI18n();
   const t = (k: string, p?: Record<string, string | number>) => translate(dict, k, p);
 
-  const snapshot = await getLearnerSnapshot(user.id);
+  const [snapshot, progress] = await Promise.all([getLearnerSnapshot(user.id), myProgress(user.id)]);
   const action = await nextBestAction(snapshot);
   const { totals, level, plan, nextLesson, active } = snapshot;
 
@@ -219,9 +220,33 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {snapshot.badges.length > 0 ? (
-        <Card className="p-5">
-          <p className="section-title">{t("dashboard.recentBadges")}</p>
+      <Card className="p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <p className="section-title">
+            {t("challenges.level", { level: progress.level })} · {t(`challenges.levelName.${progress.level}`)}
+          </p>
+          <Link href="/challenges" className="text-[13px] text-[var(--brand-info)] underline underline-offset-2">
+            {t("challenges.open")}
+          </Link>
+        </div>
+        <Progress
+          className="mt-3"
+          value={progress.progress * 100}
+          label={
+            progress.next === null
+              ? t("challenges.topLevel")
+              : t("challenges.toNext", { points: (progress.next - progress.points).toLocaleString(locale) })
+          }
+        />
+        <p className="tabular mt-2 text-[12px] text-[var(--brand-muted)]">
+          {t("challenges.points", { points: progress.points.toLocaleString(locale) })}
+          {progress.next !== null
+            ? ` · ${t("challenges.toNext", { points: (progress.next - progress.points).toLocaleString(locale) })}`
+            : ""}
+        </p>
+        {snapshot.badges.length > 0 ? (
+          <>
+          <p className="section-title mt-4">{t("dashboard.recentBadges")}</p>
           <ul className="mt-3 flex flex-wrap gap-2">
             {snapshot.badges.slice(0, 6).map((b) => (
               <li
@@ -234,8 +259,9 @@ export default async function DashboardPage() {
               </li>
             ))}
           </ul>
-        </Card>
-      ) : null}
+          </>
+        ) : null}
+      </Card>
     </div>
   );
 }

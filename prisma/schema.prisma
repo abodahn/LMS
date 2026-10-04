@@ -67,6 +67,7 @@ model User {
   feedback            CourseFeedback[]
   notifications       Notification[]
   badges              UserBadge[]
+  challengeEntries    ChallengeEntrant[]
   savedPrompts        SavedPrompt[]
   notes               UserNote[]
   bookmarks           UseCaseBookmark[]
@@ -160,6 +161,7 @@ model Department {
   prompts       PromptTemplate[]
   useCases      AiUseCase[]
   opportunities AiOpportunity[]
+  challenges    Challenge[]
 }
 
 model Section {
@@ -1085,6 +1087,45 @@ model UserBadge {
   badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, badgeId])
+}
+
+/// A collective goal for a period. Standings are per department, never per
+/// person; a department challenge shows that department's progress only.
+model Challenge {
+  id           String   @id @default(cuid())
+  title        String
+  titleAr      String?
+  titleTr      String?
+  description  String?
+  metric       String   @default("POINTS") // POINTS | COURSES | LESSONS | MINUTES | ACTIVE_DAYS
+  target       Int? // optional collective target for the period
+  departmentId String? // null = every department takes part and is ranked
+  startsAt     DateTime
+  endsAt       DateTime
+  isActive     Boolean  @default(true)
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  department Department?        @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  entrants   ChallengeEntrant[]
+
+  @@index([isActive, endsAt])
+}
+
+/// Who counts in a challenge, and for which department, frozen when it starts
+/// so a leaver or a transfer cannot be read off a moving total.
+model ChallengeEntrant {
+  id           String @id @default(cuid())
+  challengeId  String
+  userId       String
+  departmentId String
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, userId])
+  @@index([userId])
 }
 
 model Notification {
