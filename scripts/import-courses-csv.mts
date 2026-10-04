@@ -34,6 +34,8 @@ if (!path) {
 }
 
 const trustLinks = !process.argv.includes("--untrusted");
+// Fill gaps in existing courses, overwrite nothing — what the boot loader uses.
+const fillOnly = process.argv.includes("--fill-only");
 const newOnly = process.argv.includes("--new-only");
 const limitAt = process.argv.indexOf("--limit");
 const limit = limitAt > -1 ? Number(process.argv[limitAt + 1]) : 0;
@@ -79,7 +81,7 @@ for (let i = 0; i < rows.length; i += CHUNK) {
   for (const bad of preview.rows.filter((r) => r.status === "INVALID").slice(0, 3)) {
     console.log(`  invalid line ${bad.line}: ${bad.issues.join("; ")}`);
   }
-  const result = await commitCourseImport(preview, { trustLinks });
+  const result = await commitCourseImport(preview, { trustLinks, fillOnly });
   created += result.created;
   updated += result.updated;
 }

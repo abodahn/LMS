@@ -113,7 +113,7 @@ export async function saveAiIntegrationAction(_prev: SettingsState, formData: Fo
   revalidatePath("/admin/settings");
   return {
     success: d.enabled
-      ? "Saved. The AI coach works once the matching API key is present in the server environment."
+      ? "form.aiSavedKeyNeeded"
       : "common.saved",
   };
 }
@@ -149,7 +149,7 @@ export async function saveSmtpAction(_prev: SettingsState, formData: FormData): 
   });
 
   revalidatePath("/admin/settings");
-  return { success: "Saved. The SMTP password is read from the SMTP_PASSWORD environment variable." };
+  return { success: "form.smtpSaved" };
 }
 
 export async function toggleReminderAction(id: string, enabled: boolean) {
@@ -176,7 +176,7 @@ export async function runRemindersAction(): Promise<SettingsState> {
     entity: "ReminderRule",
     summary: `${sent} notifications`,
   });
-  return { success: `${sent} reminders sent` };
+  return { success: `form.remindersSent:${sent}` };
 }
 
 /**

@@ -109,14 +109,28 @@ export function CourseForm({
           <Field label={t("form.code")} required>
             {(p) => <TextInput {...p} name="code" required maxLength={40} defaultValue={values.code} />}
           </Field>
-          <Field label={t("common.status")} required>
-            {(p) => (
-              <Select {...p} name="status" defaultValue={values.status}>
-                <option value="DRAFT">{t("common.draft")}</option>
-                <option value="PUBLISHED">{t("common.published")}</option>
-                <option value="ARCHIVED">{t("common.archived")}</option>
-              </Select>
-            )}
+          <Field
+            label={t("common.status")}
+            required
+            hint={values.status === "PENDING_REVIEW" ? t("review.decideInQueue") : undefined}
+          >
+            {(p) =>
+              values.status === "PENDING_REVIEW" ? (
+                // Shown, not choosable: the queue is where this is decided.
+                <>
+                  <input type="hidden" name="status" value="PENDING_REVIEW" />
+                  <Select {...p} value="PENDING_REVIEW" disabled onChange={() => {}}>
+                    <option value="PENDING_REVIEW">{t("review.pending")}</option>
+                  </Select>
+                </>
+              ) : (
+                <Select {...p} name="status" defaultValue={values.status}>
+                  <option value="DRAFT">{t("common.draft")}</option>
+                  <option value="PUBLISHED">{t("common.published")}</option>
+                  <option value="ARCHIVED">{t("common.archived")}</option>
+                </Select>
+              )
+            }
           </Field>
 
           <Field label={t("form.titleEn")} required className="sm:col-span-2">

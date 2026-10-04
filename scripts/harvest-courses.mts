@@ -21,6 +21,11 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { validateCourseRows, commitCourseImport, COURSE_IMPORT_COLUMNS } from "../src/lib/import/courses";
 import { writtenIn, onTopic } from "../src/lib/import/relevance";
 import { youTubeOEmbedUrl } from "../src/lib/youtube";
+import { assertSearchScrapingAllowed } from "../src/lib/import/youtube-search";
+
+// This script carries its own copy of the YouTube search, so the guard is
+// checked here as well: retired for the reasons in youtube-search.ts.
+assertSearchScrapingAllowed();
 
 type Lang = "en" | "ar" | "tr";
 type Trio = Record<Lang, string>;

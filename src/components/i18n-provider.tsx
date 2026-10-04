@@ -43,13 +43,14 @@ export function useT() {
 /**
  * Server actions return dictionary keys, optionally with one argument after a
  * colon ("auth.accountLocked:5"). This resolves them on the client so error
- * text follows the user's language.
+ * text follows the user's language. Messages needing several named values
+ * take them as `params` (e.g. `{ created, updated, skipped }`).
  */
 export function useMessage() {
   const { t } = useI18n();
-  return (code?: string | null) => {
+  return (code?: string | null, params?: Record<string, string | number>) => {
     if (!code) return null;
     const [key, arg] = code.split(":");
-    return t(key, arg ? { minutes: arg, count: arg, time: arg, size: arg, types: arg } : undefined);
+    return t(key, arg ? { minutes: arg, count: arg, time: arg, size: arg, types: arg, ...params } : params);
   };
 }

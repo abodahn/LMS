@@ -17,8 +17,18 @@ const POLICY = `T&C AI usage rules the coach must always reinforce:
 export async function coachSystemPrompt(user: SessionUser, lessonId?: string | null) {
   let lessonContext = "";
   if (lessonId) {
-    const lesson = await prisma.courseLesson.findUnique({
-      where: { id: lessonId },
+    // Only a lesson the learner could open: a published course, or one they
+    // are enrolled in. Otherwise the lesson id is ignored rather than letting
+    // any id pull draft or archived lesson text into a prompt.
+    const lesson = await prisma.courseLesson.findFirst({
+      where: {
+        id: lessonId,
+        module: {
+          course: {
+            OR: [{ status: "PUBLISHED", stillAvailable: true }, { enrollments: { some: { userId: user.id } } }],
+          },
+        },
+      },
       include: { module: { include: { course: { select: { title: true, description: true } } } } },
     });
     if (lesson) {

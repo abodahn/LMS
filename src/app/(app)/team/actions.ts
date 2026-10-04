@@ -26,7 +26,8 @@ export async function nominateCourseAction(_prev: TeamState, formData: FormData)
 
   try {
     const member = await assertMyReport(manager.id, userId);
-    const course = await prisma.course.findUniqueOrThrow({ where: { id: courseId } });
+    const course = await prisma.course.findFirst({ where: { id: courseId, status: "PUBLISHED", stillAvailable: true } });
+    if (!course) return { error: "errors.validation" };
 
     const existing = await prisma.enrollment.findUnique({ where: { userId_courseId: { userId, courseId } } });
     if (existing) return { error: "learning.enrolled" };

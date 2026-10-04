@@ -164,7 +164,7 @@ export function CourseImportWizard() {
                 value={JSON.stringify({ headers: result.headers, rows: result.rows.map((r) => r.raw) })}
               />
               <FormError>{msg(commitState.error)}</FormError>
-              <FormSuccess>{commitState.success}</FormSuccess>
+              <FormSuccess>{msg(commitState.success, commitState.params)}</FormSuccess>
 
               <label className="flex items-start gap-2.5 rounded-[var(--radius-control)] border border-[var(--brand-line)] p-3">
                 <input type="checkbox" name="trustLinks" className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--brand-red)]" />

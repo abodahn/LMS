@@ -27,6 +27,10 @@ export const CATEGORIES = [
   // Egypt and Istanbul work together daily; language is operational here,
   // not a perk.
   { key: "LANGUAGES", name: "Languages", order: 11 },
+  // The factory's own subjects. Until discovery reached beyond AI and office
+  // skills there was nowhere to file line balancing or an AQL inspection course.
+  { key: "OPERATIONS", name: "Operations, Quality & Manufacturing", order: 12 },
+  { key: "SAFETY_COMPLIANCE", name: "Safety & Compliance", order: 13 },
 ];
 
 export type CourseSeed = {

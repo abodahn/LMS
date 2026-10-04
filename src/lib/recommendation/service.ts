@@ -243,7 +243,9 @@ export async function enrollFromRecommendations(userId: string, runId?: string) 
   if (!run) return { enrolled: 0 };
 
   const recs = await prisma.recommendation.findMany({
-    where: { runId: run.id, status: { not: "DISMISSED" } },
+    // Re-checked at enrolment time: a run is a snapshot, and a course it
+    // suggested may have been withdrawn or archived since.
+    where: { runId: run.id, status: { not: "DISMISSED" }, course: { status: "PUBLISHED", stillAvailable: true } },
     orderBy: { rank: "asc" },
   });
 

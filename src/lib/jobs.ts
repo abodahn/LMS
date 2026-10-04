@@ -3,6 +3,7 @@ import { getSetting, setSetting } from "./settings";
 import { runReminderRules } from "./notifications";
 import { sweepCourseLinks } from "./links";
 import { runRecurringAssignments } from "./assignments";
+import { recomputeQualityScores } from "./quality";
 import { audit } from "./audit";
 
 /**
@@ -18,7 +19,7 @@ import { audit } from "./audit";
  * jobs, and a key/value store already exists for exactly this kind of state.
  */
 
-export type JobKey = "reminders" | "linkSweep" | "recurringAssignments";
+export type JobKey = "reminders" | "linkSweep" | "recurringAssignments" | "qualityScores";
 
 type Job = {
   key: JobKey;
@@ -72,6 +73,15 @@ export const JOBS: Job[] = [
     run: async () => {
       const r = await runRecurringAssignments();
       return `${r.rules} rule(s) acted, ${r.assigned} assigned, ${r.refreshed} refreshed`;
+    },
+  },
+  {
+    key: "qualityScores",
+    everyHours: 24,
+    label: "Course quality scores",
+    run: async () => {
+      const r = await recomputeQualityScores();
+      return `${r.considered} course(s) with evidence, ${r.updated} score(s) changed`;
     },
   },
 ];

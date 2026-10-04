@@ -17,6 +17,8 @@ type JobRow = { key: string; label: string; everyHours: number; lastRun: string 
 const JOB_LABEL: Record<string, string> = {
   reminders: "form.jobReminders",
   linkSweep: "form.jobLinkSweep",
+  recurringAssignments: "form.jobRecurringAssignments",
+  qualityScores: "form.jobQualityScores",
 };
 
 /**

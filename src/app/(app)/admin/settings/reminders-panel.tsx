@@ -6,7 +6,7 @@ import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
 import { FormSuccess } from "@/components/ui/form";
-import { useT } from "@/components/i18n-provider";
+import { useMessage, useT } from "@/components/i18n-provider";
 import { runRemindersAction, toggleReminderAction, type SettingsState } from "./actions";
 
 type Rule = {
@@ -21,6 +21,7 @@ type Rule = {
 
 export function RemindersPanel({ rules }: { rules: Rule[] }) {
   const t = useT();
+  const msg = useMessage();
   const router = useRouter();
   const [state, setState] = useState<SettingsState>({});
   const [pending, start] = useTransition();
@@ -41,7 +42,7 @@ export function RemindersPanel({ rules }: { rules: Rule[] }) {
           {pending ? t("common.saving") : t("form.runNow")}
         </Button>
       </div>
-      <FormSuccess>{state.success}</FormSuccess>
+      <FormSuccess>{msg(state.success)}</FormSuccess>
       <p className="mt-1 text-[13px] text-[var(--brand-muted)]">
         {t("form.reminderDedupeHint")}
       </p>

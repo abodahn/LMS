@@ -202,7 +202,7 @@ export function UserForm({
       {user && canManage ? (
         <Card className="p-5">
           <h2 className="text-base font-semibold text-[var(--brand-ink)]">{t("common.actions")}</h2>
-          <FormSuccess>{adminState.success}</FormSuccess>
+          <FormSuccess>{msg(adminState.success, adminState.params)}</FormSuccess>
           <FormError>{msg(adminState.error)}</FormError>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button

@@ -33,7 +33,7 @@ const courseSchema = z.object({
   certificateCost: z.coerce.number().min(0).max(100000).optional(),
   aiLevelId: z.string().optional(),
   categoryId: z.string().optional(),
-  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
+  status: z.enum(["DRAFT", "PENDING_REVIEW", "PUBLISHED", "ARCHIVED"]),
   isInternal: z.enum(["yes", "no"]),
   isTechnical: z.enum(["yes", "no"]),
   isMandatory: z.enum(["yes", "no"]),
@@ -117,9 +117,25 @@ export async function saveCourseAction(_prev: CourseState, formData: FormData): 
   };
 
   const before = d.courseId ? await prisma.course.findUnique({ where: { id: d.courseId } }) : null;
+
+  // The review queue is the only way in or out of PENDING_REVIEW. A reviewer
+  // opening a queued course to fix its category must not take it out of the
+  // queue by saving — with no decision, no verification record and no audit —
+  // and nobody can put a course into the queue from here either.
+  const status =
+    before?.status === "PENDING_REVIEW" ? "PENDING_REVIEW" : d.status === "PENDING_REVIEW" ? (before?.status ?? "DRAFT") : d.status;
+
+  // A score set by hand becomes the base the nightly job blends from. Left
+  // alone, the job kept blending against the base it recorded first and wrote
+  // the old figure back within a day.
+  const qualityReset =
+    before && Math.abs(before.qualityScore - d.qualityScore) > 0.0005
+      ? { qualityBreakdown: JSON.stringify({ base: d.qualityScore, setBy: admin.id, setAt: new Date().toISOString() }) }
+      : {};
+
   const course = d.courseId
-    ? await prisma.course.update({ where: { id: d.courseId }, data })
-    : await prisma.course.create({ data: { ...data, createdById: admin.id } });
+    ? await prisma.course.update({ where: { id: d.courseId }, data: { ...data, status, ...qualityReset } })
+    : await prisma.course.create({ data: { ...data, status, createdById: admin.id } });
 
   // Relations are replaced wholesale — the form always submits the full set.
   const competencies = formData.getAll("competencies").map(String).filter(Boolean);

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Download, Plus, Sparkles, TriangleAlert, Upload } from "lucide-react";
+import { Download, Inbox, Plus, Sparkles, TriangleAlert, Upload } from "lucide-react";
 import { requirePermission } from "@/lib/auth";
 import { aiAvailable } from "@/lib/ai/provider";
 import { prisma } from "@/lib/db";
@@ -20,7 +20,10 @@ const PAGE_SIZE = 25;
 
 export default async function AdminCoursesPage({ searchParams }: PageProps<"/admin/courses">) {
   const admin = await requirePermission("catalog.view");
-  const aiEnabled = await aiAvailable();
+  const [aiEnabled, pendingReview] = await Promise.all([
+    aiAvailable(),
+    prisma.course.count({ where: { status: "PENDING_REVIEW" } }),
+  ]);
   const { dict, locale } = await getI18n();
   const t = (k: string) => translate(dict, k);
   const params = await searchParams;
@@ -92,6 +95,12 @@ export default async function AdminCoursesPage({ searchParams }: PageProps<"/adm
               <Download size={15} />
               {t("common.exportExcel")}
             </DownloadLink>
+            {pendingReview > 0 && admin.permissions.includes("catalog.verify") ? (
+              <LinkButton href="/admin/courses/review" size="sm">
+                <Inbox size={15} />
+                {t("review.queueButton")} ({pendingReview})
+              </LinkButton>
+            ) : null}
             {aiEnabled && admin.permissions.includes("catalog.manage") ? (
               <LinkButton href="/admin/courses/ai" variant="secondary" size="sm">
                 <Sparkles size={15} />

@@ -459,6 +459,10 @@ export async function remediationFor(attemptId: string) {
       module: {
         course: {
           isInternal: true,
+          // Only lessons from a course an employee could open: a draft or an
+          // archived course's lessons are not something to point anyone at.
+          status: "PUBLISHED",
+          stillAvailable: true,
           competencies: { some: { competency: { key: { in: weak.map((w) => w.key) } } } },
         },
       },

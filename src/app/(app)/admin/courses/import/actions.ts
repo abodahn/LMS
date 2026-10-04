@@ -10,7 +10,12 @@ import {
   type CourseImportPreview,
 } from "@/lib/import/courses";
 
-export type CourseImportState = { error?: string; success?: string; preview?: CourseImportPreview };
+export type CourseImportState = {
+  error?: string;
+  success?: string;
+  params?: Record<string, number>;
+  preview?: CourseImportPreview;
+};
 
 export async function previewCourseImportAction(
   _prev: CourseImportState,
@@ -63,10 +68,7 @@ export async function commitCourseImportAction(
 
   revalidatePath("/admin/courses");
   return {
-    success: `${result.created} created, ${result.updated} updated, ${result.skipped} skipped. ${
-      result.verified
-        ? "Marked verified — they are live in the catalog and available to the recommendation engine."
-        : "Left unverified: run Courses → Needs review before they reach anyone's path."
-    }`,
+    success: result.verified ? "form.coursesImportedVerified" : "form.coursesImportedUnverified",
+    params: { created: result.created, updated: result.updated, skipped: result.skipped, queued: result.queued },
   };
 }

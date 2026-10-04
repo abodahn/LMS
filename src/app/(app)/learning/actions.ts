@@ -31,6 +31,10 @@ export async function enrollFromRecommendationAction(runId: string) {
 
 export async function enrollCourseAction(courseId: string) {
   const user = await requireUser();
+  // Only what the catalogue would show: an id for a queued, draft or archived
+  // course must not become an enrolment by being posted directly.
+  const course = await prisma.course.findFirst({ where: { id: courseId, status: "PUBLISHED", stillAvailable: true }, select: { id: true } });
+  if (!course) redirect("/catalog");
   const existing = await prisma.enrollment.findUnique({
     where: { userId_courseId: { userId: user.id, courseId } },
   });

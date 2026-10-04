@@ -73,8 +73,8 @@ export const SKILL_RULES: { skill: string; at: number; phrases: string[]; anyVen
     phrases: ["production planning", "production scheduling", "master production schedule", "جدولة الإنتاج", "üretim planlama"],
   },
   { skill: "CUTTING_ROOM", at: 2, phrases: ["marker making", "fabric cutting", "spreading and cutting"] },
-  { skill: "AQL_INSPECTION", at: 3, phrases: ["aql", "acceptable quality limit", "acceptance sampling"] },
-  { skill: "INLINE_QC", at: 3, phrases: ["quality control", "in-line inspection", "مراقبة الجودة", "kalite kontrol"] },
+  { skill: "AQL_INSPECTION", at: 3, phrases: ["aql", "acceptable quality limit", "acceptance sampling", "ansi tables", "aql numune"] },
+  { skill: "INLINE_QC", at: 3, phrases: ["quality control", "quality inspection", "in-line inspection", "مراقبة الجودة", "kalite kontrol"] },
   {
     skill: "DEFECT_RCA",
     at: 3,
@@ -86,9 +86,23 @@ export const SKILL_RULES: { skill: string; at: number; phrases: string[]; anyVen
   {
     skill: "PREVENTIVE_MAINTENANCE",
     at: 3,
-    phrases: ["preventive maintenance", "preventative maintenance", "total productive maintenance", "الصيانة الوقائية"],
+    phrases: [
+      "preventive maintenance",
+      "preventative maintenance",
+      "total productive maintenance",
+      "machine maintenance",
+      "daily maintenance",
+      "weekly maintenance",
+      "monthly maintenance",
+      "الصيانة الوقائية",
+      "صيانة ماكينات",
+    ],
   },
-  { skill: "MECHANICAL_FAULTS", at: 2, phrases: ["mechanical maintenance", "troubleshooting machinery"] },
+  {
+    skill: "MECHANICAL_FAULTS",
+    at: 2,
+    phrases: ["mechanical maintenance", "troubleshooting machinery", "sewing machine repair", "repairing sewing machines"],
+  },
   { skill: "ELECTRICAL_FAULTS", at: 2, phrases: ["electrical troubleshooting", "electrical maintenance", "plc programming"] },
   {
     skill: "TEAM_LEADERSHIP",
@@ -115,10 +129,37 @@ export const SKILL_RULES: { skill: string; at: number; phrases: string[]; anyVen
   {
     skill: "WORKPLACE_SAFETY",
     at: 3,
-    phrases: ["workplace safety", "occupational health", "health and safety", "السلامة المهنية", "iş güvenliği"],
+    phrases: [
+      "workplace safety",
+      "occupational health",
+      "occupational safety",
+      "health and safety",
+      "safety, health",
+      "risk assessment",
+      "assessing risk",
+      "السلامة المهنية",
+      "iş güvenliği",
+    ],
   },
   { skill: "SOCIAL_COMPLIANCE", at: 2, phrases: ["social compliance", "labour standards", "labor standards", "bsci"] },
-  { skill: "CHEMICAL_AWARENESS", at: 2, phrases: ["reach compliance", "chemical safety", "hazardous substances"] },
+  {
+    // Named programmes as well as the general terms: garment chemical
+    // compliance is taught under ZDHC's MRSL and, in Türkiye, KKDİK.
+    skill: "CHEMICAL_AWARENESS",
+    at: 2,
+    phrases: [
+      "reach compliance",
+      "chemical safety",
+      "chemical compliance",
+      "hazardous substances",
+      "restricted substances",
+      "safety data sheet",
+      "safety data sheets",
+      "mrsl",
+      "zdhc",
+      "kkdik",
+    ],
+  },
 ];
 
 /** Product courses, which only the tool skills may match. */

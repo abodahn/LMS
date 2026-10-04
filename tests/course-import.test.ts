@@ -123,3 +123,51 @@ describe("parseWeighted", () => {
     expect(parseWeighted("FUNDAMENTALS,,WORKPLACE")).toHaveLength(2);
   });
 });
+
+import { deriveKind, fillEmpty, normaliseSourceKey, resolveImportStatus } from "../src/lib/import/courses";
+
+/**
+ * Governance rules for imported rows. Each was a confirmed defect: a typo'd
+ * status publishing straight to employees, new imports all typed COURSE, and
+ * the boot refresh writing over an administrator's corrections.
+ */
+describe("import governance", () => {
+  it("publishes only when the Status cell is empty; anything unrecognised goes to review", () => {
+    expect(resolveImportStatus(undefined)).toBe("PUBLISHED");
+    expect(resolveImportStatus("  ")).toBe("PUBLISHED");
+    expect(resolveImportStatus("pending_review")).toBe("PENDING_REVIEW");
+    expect(resolveImportStatus("Pending")).toBe("PENDING_REVIEW");
+    expect(resolveImportStatus("ARCHIVED")).toBe("PENDING_REVIEW");
+    expect(resolveImportStatus("draft")).toBe("DRAFT");
+  });
+
+  it("derives type and source the way the migration backfilled them", () => {
+    expect(deriveKind({ code: "MSL-EN-x", platform: "Microsoft Learn · learning path", url: null, hours: 5 })).toEqual({
+      sourceKey: "MS_LEARN",
+      contentType: "PATH",
+    });
+    expect(deriveKind({ code: "YT-abc", platform: "YouTube", url: "https://www.youtube.com/watch?v=abc", hours: 2 })).toEqual({
+      sourceKey: "YOUTUBE",
+      contentType: "VIDEO",
+    });
+    expect(
+      deriveKind({ code: "X", platform: "YouTube", url: "https://www.youtube.com/playlist?list=PL1", hours: 3 }).contentType,
+    ).toBe("PLAYLIST");
+    expect(deriveKind({ code: "X", platform: "Other", url: "https://www.freecodecamp.org/learn/x/", hours: 3 }).sourceKey).toBe(
+      "FREECODECAMP",
+    );
+    expect(deriveKind({ code: "X", platform: "Other", url: null, hours: 0.5 })).toEqual({ sourceKey: null, contentType: "MICRO" });
+  });
+
+  it("normalises source keys so case and punctuation cannot defeat a comparison", () => {
+    expect(normaliseSourceKey("IBM SkillsBuild")).toBe("IBM_SKILLSBUILD");
+    expect(normaliseSourceKey("freecodecamp")).toBe("FREECODECAMP");
+    expect(normaliseSourceKey("  ")).toBeNull();
+  });
+
+  it("fills only what is missing and never overwrites a value someone set", () => {
+    const existing = { titleAr: "عنوان صححه المسؤول", categoryId: null, description: "", estimatedHours: 3 };
+    const incoming = { titleAr: "from the file", categoryId: "cat1", description: "from the file", estimatedHours: 9 };
+    expect(fillEmpty(existing, incoming)).toEqual({ categoryId: "cat1", description: "from the file" });
+  });
+});

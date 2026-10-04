@@ -90,7 +90,21 @@ export async function sweepCourseLinks(
   const now = Date.now();
 
   const candidates = await prisma.course.findMany({
-    where: { url: { not: null }, stillAvailable: true },
+    // freeCodeCamp's terms forbid monitoring its site with a crawler, so its
+    // links are never swept; their existence is checked against the public
+    // curriculum repository when the catalogue is refreshed instead.
+    //
+    // The null case is spelled out: in SQL "not freeCodeCamp" is unknown for a
+    // row with no source, and every course created in the admin form has none —
+    // written the short way, those would silently never be checked again.
+    where: {
+      url: { not: null },
+      stillAvailable: true,
+      OR: [{ sourceKey: null }, { sourceKey: { not: "FREECODECAMP" } }],
+      // By host as well: a freeCodeCamp course imported without a Source
+      // column, or before there was one, is still freeCodeCamp's site.
+      NOT: { url: { contains: "freecodecamp.org" } },
+    },
     select: {
       id: true,
       code: true,

@@ -53,14 +53,14 @@ export default async function CatalogPage({
     over10: { gte: 10 },
   };
 
-  // Course type is read from the platform string, which is where the shape of a
-  // resource actually lives today — a dedicated column belongs with the content
-  // types in a later phase.
+  // Course type is its own column now; it used to be guessed from the
+  // platform string, which only knew YouTube and "learning path".
   const TYPE: Record<string, object> = {
     internal: { isInternal: true },
-    path: { platform: { contains: "learning path" } },
-    video: { platform: { contains: "YouTube" } },
-    course: { isInternal: false, NOT: [{ platform: { contains: "YouTube" } }, { platform: { contains: "learning path" } }] },
+    course: { isInternal: false, contentType: "COURSE" },
+    micro: { contentType: "MICRO" },
+    path: { contentType: "PATH" },
+    video: { contentType: { in: ["VIDEO", "PLAYLIST"] } },
   };
 
   const where = {
@@ -144,9 +144,15 @@ export default async function CatalogPage({
     prisma.competency.findMany({ orderBy: { order: "asc" } }),
     // 958 providers exist and most carry a single YouTube video; a select of
     // everything would be unusable. Only those with a real body of content.
+    // Providers with something an employee can actually open, counted the same
+    // way: a provider with only queued or withdrawn courses is not a choice.
     prisma.courseProvider.findMany({
-      where: { courses: { some: {} } },
-      select: { id: true, name: true, _count: { select: { courses: true } } },
+      where: { courses: { some: { status: "PUBLISHED", stillAvailable: true } } },
+      select: {
+        id: true,
+        name: true,
+        _count: { select: { courses: { where: { status: "PUBLISHED", stillAvailable: true } } } },
+      },
       orderBy: { name: "asc" },
     }),
     prisma.course.count({ where }),
@@ -248,6 +254,7 @@ export default async function CatalogPage({
             options: [
               { value: "internal", label: t("common.typeInternal") },
               { value: "course", label: t("common.typeCourse") },
+              { value: "micro", label: t("common.typeMicro") },
               { value: "path", label: t("common.typePath") },
               { value: "video", label: t("common.typeVideo") },
             ],

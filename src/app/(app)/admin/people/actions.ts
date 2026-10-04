@@ -10,8 +10,13 @@ import { commitEmployeeImport, previewEmployeeImport, validateEmployeeRows, type
 import { generateRecommendations } from "@/lib/recommendation/service";
 import { notify } from "@/lib/notifications";
 
-export type PeopleState = { error?: string; success?: string };
-export type ImportState = { error?: string; success?: string; preview?: ImportPreview };
+export type PeopleState = { error?: string; success?: string; params?: Record<string, string> };
+export type ImportState = {
+  error?: string;
+  success?: string;
+  params?: Record<string, number>;
+  preview?: ImportPreview;
+};
 
 const userSchema = z.object({
   userId: z.string().optional(),
@@ -117,7 +122,7 @@ export async function resetUserPasswordAction(userId: string): Promise<PeopleSta
     entityId: userId,
   });
   // The password is shown once to the administrator and never stored in plain text.
-  return { success: `A temporary password has been set: ${password}` };
+  return { success: "form.tempPasswordSet", params: { password } };
 }
 
 export async function rebuildPathAction(userId: string): Promise<PeopleState> {
@@ -184,7 +189,10 @@ export async function commitImportAction(_prev: ImportState, formData: FormData)
   });
 
   revalidatePath("/admin/people");
-  return { success: `${result.created} created · ${result.updated} updated · ${result.skipped} skipped` };
+  return {
+    success: "form.employeesImported",
+    params: { created: result.created, updated: result.updated, skipped: result.skipped },
+  };
 }
 
 function randomPassword() {

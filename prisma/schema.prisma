@@ -532,7 +532,9 @@ model Course {
   certificateCost      Float?
   aiLevelId            String?
   categoryId           String?
-  status               String    @default("PUBLISHED") // DRAFT | PUBLISHED | ARCHIVED
+  /// DRAFT | PENDING_REVIEW | PUBLISHED | ARCHIVED. Discovery lands PENDING_REVIEW,
+  /// which nothing outside the review queue shows.
+  status               String    @default("PUBLISHED")
   isInternal           Boolean   @default(false)
   isMandatory          Boolean   @default(false)
   /// Completion needs a supervisor to confirm they watched it done. A video
@@ -541,6 +543,18 @@ model Course {
   /// Drafted by the AI course builder. Stays true after editing and publishing,
   /// so anyone can always see which courses started life as a machine draft.
   aiGenerated          Boolean   @default(false)
+  /// COURSE | PATH | MICRO | PLAYLIST | VIDEO | ARTICLE | BOOK | PDF | EXERCISE | WORKSHOP | WEBINAR
+  contentType          String    @default("COURSE")
+  /// Where discovery found it: MS_LEARN | YOUTUBE | SAYLOR | IBM_SKILLSBUILD | OPENLEARN | MIT_OCW | FREECODECAMP | BTK | MANUAL
+  sourceKey            String?
+  /// The credit a source's licence requires beside the course, e.g. "MIT OpenCourseWare, CC BY-NC-SA 4.0".
+  attribution          String?
+  /// When discovery first proposed it; the review queue's order.
+  discoveredAt         DateTime?
+  /// Why a reviewer rejected it, kept so the next harvest does not propose it again.
+  reviewNote           String?
+  /// The inputs the quality score was computed from, as JSON, so the number can be explained.
+  qualityBreakdown     String    @default("{}")
   isRecommended        Boolean   @default(false)
   isTechnical          Boolean   @default(false)
   youtubePlaylistId    String?
@@ -590,6 +604,7 @@ model Course {
   @@index([status])
   @@index([providerId])
   @@index([aiLevelId])
+  @@index([status, contentType])
 }
 
 model CoursePrerequisite {

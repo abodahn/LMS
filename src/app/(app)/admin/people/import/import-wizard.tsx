@@ -140,7 +140,7 @@ export function ImportWizard() {
                 value={JSON.stringify({ headers: result.headers, rows: result.rows.map((r) => r.raw) })}
               />
               <FormError>{msg(commitState.error)}</FormError>
-              <FormSuccess>{commitState.success}</FormSuccess>
+              <FormSuccess>{msg(commitState.success, commitState.params)}</FormSuccess>
 
               <Field
                 label={t("form.tempPassword")}

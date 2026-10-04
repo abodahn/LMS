@@ -43,6 +43,7 @@ export default async function AssessmentResultPage({ params }: PageProps<"/asses
     orderBy: { generatedAt: "desc" },
     include: {
       recommendations: {
+        where: { course: { status: "PUBLISHED", stillAvailable: true } },
         orderBy: { rank: "asc" },
         include: { course: { include: { provider: true, aiLevel: true } }, reasons: true },
       },

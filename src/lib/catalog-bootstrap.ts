@@ -151,7 +151,9 @@ export async function ensureCatalogue(): Promise<{ imported: number; skipped: bo
         // courses were imported before the Languages category existed, were
         // filed as uncategorised, and could never fix themselves while "already
         // stored" meant "leave alone".
-        const done = await importSlice([path]);
+        // Fill-only: a boot refresh supplies what a course is missing and
+        // never overwrites what someone has since corrected.
+        const done = await importSlice([path, "--fill-only"]);
         if (done.ok) console.log(`[catalogue] ${path}: refreshed (${rows} rows)`);
         continue;
       }

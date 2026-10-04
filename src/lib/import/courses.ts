@@ -57,6 +57,12 @@ export const COURSE_IMPORT_COLUMNS = [
   "Title TR",
   "Description AR",
   "Description TR",
+  // Governance, read only when a course is first created: a harvest proposes
+  // with Status PENDING_REVIEW, and after that the status is the reviewer's.
+  "Status",
+  "Content Type",
+  "Source",
+  "Attribution",
 ] as const;
 
 const rowSchema = z.object({
@@ -86,7 +92,73 @@ const rowSchema = z.object({
   titleTr: z.string().trim().max(200).optional(),
   descriptionAr: z.string().trim().max(4000).optional(),
   descriptionTr: z.string().trim().max(4000).optional(),
+  status: z.string().trim().optional(),
+  contentType: z.string().trim().optional(),
+  source: z.string().trim().max(40).optional(),
+  attribution: z.string().trim().max(300).optional(),
 });
+
+export const IMPORT_STATUSES = ["PUBLISHED", "PENDING_REVIEW", "DRAFT"] as const;
+export const CONTENT_TYPES = [
+  "COURSE",
+  "PATH",
+  "MICRO",
+  "PLAYLIST",
+  "VIDEO",
+  "ARTICLE",
+  "BOOK",
+  "PDF",
+  "EXERCISE",
+  "WORKSHOP",
+  "WEBINAR",
+] as const;
+
+/**
+ * The status a new row gets. An empty cell means the file predates the column
+ * and is publishing as it always has. Anything else that does not match — a
+ * typo, "Pending", "Rejected" — goes to review rather than straight to
+ * employees: failing closed is the only safe reading of a value nobody meant.
+ */
+export function resolveImportStatus(value: string | undefined): (typeof IMPORT_STATUSES)[number] {
+  if (!value?.trim()) return "PUBLISHED";
+  const hit = matchEnum([value], IMPORT_STATUSES).ok[0];
+  return IMPORT_STATUSES.find((s) => s === hit) ?? "PENDING_REVIEW";
+}
+
+/** "IBM SkillsBuild", "ibm_skillsbuild" and "IBM-SKILLSBUILD" are the same source. */
+export function normaliseSourceKey(value: string | undefined): string | null {
+  const key = value?.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return key || null;
+}
+
+/**
+ * Content type and source for a row whose file does not say — the same rules
+ * the migration used to backfill existing courses, so a course imported today
+ * is described the same way as one imported last month.
+ */
+export function deriveKind(input: { code: string; platform: string; url: string | null; hours: number }) {
+  const platform = input.platform.toLowerCase();
+  const url = (input.url ?? "").toLowerCase();
+  const sourceKey = input.code.toUpperCase().startsWith("MSL-")
+    ? "MS_LEARN"
+    : url.includes("freecodecamp.org")
+      ? "FREECODECAMP"
+      : platform.includes("youtube")
+        ? "YOUTUBE"
+        : platform.includes("btk")
+          ? "BTK"
+          : null;
+  const contentType: (typeof CONTENT_TYPES)[number] = platform.includes("learning path")
+    ? "PATH"
+    : platform.includes("youtube")
+      ? url.includes("playlist?list=")
+        ? "PLAYLIST"
+        : "VIDEO"
+      : input.hours < 1
+        ? "MICRO"
+        : "COURSE";
+  return { sourceKey, contentType };
+}
 
 export type CourseRow = z.infer<typeof rowSchema>;
 
@@ -181,6 +253,10 @@ export async function validateCourseRows(headers: string[], rows: ParsedRow[]): 
       titleTr: pick(raw, "Title TR", "TitleTr", "Turkish Title"),
       descriptionAr: pick(raw, "Description AR", "DescriptionAr"),
       descriptionTr: pick(raw, "Description TR", "DescriptionTr"),
+      status: pick(raw, "Status"),
+      contentType: pick(raw, "Content Type", "ContentType", "Type"),
+      source: pick(raw, "Source"),
+      attribution: pick(raw, "Attribution", "Credit"),
     };
 
     // A missing code is recoverable: derive a stable one from the title.
@@ -224,6 +300,12 @@ export async function validateCourseRows(headers: string[], rows: ParsedRow[]): 
     if (data.category && !categories.some((c) => norm(c.key) === norm(data.category!) || norm(c.name) === norm(data.category!))) {
       unknown.categories.add(data.category);
       warnings.push(`Unknown category "${data.category}" — left uncategorised`);
+    }
+    if (data.status?.trim() && !matchEnum([data.status], IMPORT_STATUSES).ok.length) {
+      warnings.push(`Unknown status "${data.status}" — sent to the review queue instead of published`);
+    }
+    if (data.contentType?.trim() && !matchEnum([data.contentType], CONTENT_TYPES).ok.length) {
+      warnings.push(`Unknown content type "${data.contentType}" — worked out from the platform instead`);
     }
 
     const hours = parseHours(data.hours);
@@ -295,7 +377,22 @@ export async function validateCourseRows(headers: string[], rows: ParsedRow[]): 
  * export, where the links are as good as any a person would click through. The
  * choice is audited either way.
  */
-export async function commitCourseImport(preview: CourseImportPreview, options: { trustLinks?: boolean } = {}) {
+export async function commitCourseImport(
+  preview: CourseImportPreview,
+  options: {
+    trustLinks?: boolean;
+    /**
+     * Fill gaps in existing courses and never overwrite anything already set.
+     * The catalogue loader re-imports its small files on every boot so that a
+     * course picks up reference data that arrived later — a category created
+     * after it was imported — and nothing more. Without this an administrator's
+     * corrections to such a course (an Arabic title, a category, competencies)
+     * were written back to the file's version on every restart. An explicit
+     * upload through the admin screen still overwrites: that is what it is for.
+     */
+    fillOnly?: boolean;
+  } = {},
+) {
   // Row-by-row on purpose: each course rewrites five relation tables, and an
   // administrator would rather wait than get a half-applied catalog. Measured
   // at roughly a minute per thousand rows on SQLite (scripts/import-smoke.mts).
@@ -323,6 +420,8 @@ export async function commitCourseImport(preview: CourseImportPreview, options: 
   const slugByCode = new Map(existingSlugs.map((c) => [c.code, c.slug] as const));
 
   let created = 0;
+
+  let queued = 0;
   let updated = 0;
   let lessons = 0;
 
@@ -351,7 +450,8 @@ export async function commitCourseImport(preview: CourseImportPreview, options: 
     const language = LOCALES.find((l) => l === (d.language ?? "").toLowerCase()) ?? "en";
     const isFree = d.free ? truthy(d.free) : !d.price;
 
-    const data = {
+    // What the file owns and may rewrite on every import: what the course is.
+    const content = {
       slug: uniqueSlug(d.title, d.code, usedSlugs, slugByCode.get(d.code)),
       title: d.title,
       titleAr: d.titleAr || null,
@@ -359,9 +459,6 @@ export async function commitCourseImport(preview: CourseImportPreview, options: 
       description: d.description || d.title,
       descriptionAr: d.descriptionAr || null,
       descriptionTr: d.descriptionTr || null,
-      outcomes: "[]",
-      outcomesAr: "[]",
-      outcomesTr: "[]",
       providerId: provider.id,
       platform: d.platform || provider.name,
       url: d.url || null,
@@ -373,17 +470,41 @@ export async function commitCourseImport(preview: CourseImportPreview, options: 
       certificateAvailable: truthy(d.certificate),
       aiLevelId: level?.id ?? null,
       categoryId: category?.id ?? null,
-      status: "PUBLISHED",
       isTechnical: truthy(d.technical),
-      isInternal: false,
       rating: d.rating ? Number(d.rating.replace(/[^\d.]/g, "")) || null : null,
       ratingSource: d.rating ? provider.name : null,
-      qualityScore: 0.7,
-      // A course with no URL has nothing to open, so it is never verified
-      // whatever the administrator says about the source.
+      ...(d.attribution ? { attribution: d.attribution } : {}),
+    };
+
+    // A course with no URL has nothing to open, so it is never verified
+    // whatever the administrator says about the source.
+    const linkState = {
       lastVerifiedAt: options.trustLinks && d.url ? new Date() : null,
       linkWorking: Boolean(options.trustLinks && d.url),
+      linkFailCount: 0,
       stillAvailable: true,
+    };
+
+    // What belongs to the people and jobs running the catalogue, written once,
+    // when the course is created. Re-importing used to write all of it again:
+    // the catalogue files are re-imported on every boot, so an archived course
+    // came back as published, a course the link check had withdrawn came back
+    // into the catalogue, a computed quality score fell back to 0.7, and
+    // outcomes an administrator had written were cleared — each restart quietly
+    // undoing whatever had been decided since.
+    const status = resolveImportStatus(d.status);
+    const derived = deriveKind({ code: d.code, platform: content.platform, url: content.url, hours: content.estimatedHours });
+    const governance = {
+      status,
+      isInternal: false,
+      contentType: matchEnum([d.contentType ?? ""], CONTENT_TYPES).ok[0] ?? derived.contentType,
+      sourceKey: normaliseSourceKey(d.source) ?? derived.sourceKey,
+      discoveredAt: status === "PENDING_REVIEW" ? new Date() : null,
+      qualityScore: 0.7,
+      outcomes: "[]",
+      outcomesAr: "[]",
+      outcomesTr: "[]",
+      ...linkState,
     };
 
     // One transaction per row. The catalogue loader runs this in a child
@@ -394,14 +515,28 @@ export async function commitCourseImport(preview: CourseImportPreview, options: 
     const { course, isNew } = await prisma.$transaction(
       async (tx) => {
         const existing = await tx.course.findUnique({ where: { code: d.code } });
+        // A changed URL is a different thing to check, so its link state
+        // starts again; an unchanged one keeps whatever the sweep has found.
         const course = existing
-          ? await tx.course.update({ where: { code: d.code }, data })
-          : await tx.course.create({ data: { code: d.code, ...data } });
+          ? await tx.course.update({
+              where: { code: d.code },
+              data: {
+                ...(options.fillOnly ? fillEmpty(existing, content) : content),
+                ...(!options.fillOnly && existing.url !== content.url ? linkState : {}),
+              },
+            })
+          : await tx.course.create({ data: { code: d.code, ...content, ...governance } });
+
+        // A relation is rewritten only when the file says something about it:
+        // an empty column is "not in this file", never "clear it". In fill-only
+        // mode a course that already has any rows of a kind keeps them.
+        const keep = async (count: () => Promise<number>) => Boolean(existing && options.fillOnly && (await count()) > 0);
 
         const weighted = parseWeighted(d.competencies);
         const comp = matchEnum(weighted.map((w) => w.key), COMPETENCY_KEYS).ok;
-        await tx.courseCompetency.deleteMany({ where: { courseId: course.id } });
-        for (const key of comp) {
+        const writeComp = comp.length > 0 && !(await keep(() => tx.courseCompetency.count({ where: { courseId: course.id } })));
+        if (writeComp) await tx.courseCompetency.deleteMany({ where: { courseId: course.id } });
+        for (const key of writeComp ? comp : []) {
           const competency = await tx.competency.findUnique({ where: { key } });
           if (competency) {
             await tx.courseCompetency.create({
@@ -415,27 +550,37 @@ export async function commitCourseImport(preview: CourseImportPreview, options: 
           }
         }
 
-        await tx.courseDepartment.deleteMany({ where: { courseId: course.id } });
-        for (const name of list(d.departments)) {
+        const depts = list(d.departments);
+        const writeDepts = depts.length > 0 && !(await keep(() => tx.courseDepartment.count({ where: { courseId: course.id } })));
+        if (writeDepts) await tx.courseDepartment.deleteMany({ where: { courseId: course.id } });
+        for (const name of writeDepts ? depts : []) {
           const dept = departments.find((x) => norm(x.code) === norm(name) || norm(x.name) === norm(name));
           if (dept) {
             await tx.courseDepartment.create({ data: { courseId: course.id, departmentId: dept.id, weight: 2 } });
           }
         }
 
-        await tx.courseJobFamily.deleteMany({ where: { courseId: course.id } });
-        for (const jobFamily of matchEnum(list(d.jobFamilies), JOB_FAMILIES).ok) {
+        const families = matchEnum(list(d.jobFamilies), JOB_FAMILIES).ok;
+        const writeFamilies =
+          families.length > 0 && !(await keep(() => tx.courseJobFamily.count({ where: { courseId: course.id } })));
+        if (writeFamilies) await tx.courseJobFamily.deleteMany({ where: { courseId: course.id } });
+        for (const jobFamily of writeFamilies ? families : []) {
           await tx.courseJobFamily.create({ data: { courseId: course.id, jobFamily, weight: 2 } });
         }
 
-        await tx.courseGoal.deleteMany({ where: { courseId: course.id } });
-        for (const goalKey of matchEnum(list(d.goals), LEARNING_GOALS).ok) {
+        const goals = matchEnum(list(d.goals), LEARNING_GOALS).ok;
+        const writeGoals = goals.length > 0 && !(await keep(() => tx.courseGoal.count({ where: { courseId: course.id } })));
+        if (writeGoals) await tx.courseGoal.deleteMany({ where: { courseId: course.id } });
+        for (const goalKey of writeGoals ? goals : []) {
           await tx.courseGoal.create({ data: { courseId: course.id, goalKey, weight: 2 } });
         }
 
-        await tx.courseLanguage.deleteMany({ where: { courseId: course.id } });
-        await tx.courseLanguage.create({ data: { courseId: course.id, language, isSubtitle: false } });
-        for (const sub of list(d.subtitles)) {
+        const keepLanguages = await keep(() => tx.courseLanguage.count({ where: { courseId: course.id } }));
+        if (!keepLanguages) {
+          await tx.courseLanguage.deleteMany({ where: { courseId: course.id } });
+          await tx.courseLanguage.create({ data: { courseId: course.id, language, isSubtitle: false } });
+        }
+        for (const sub of keepLanguages ? [] : list(d.subtitles)) {
           const code = LOCALES.find((l) => l === sub.toLowerCase());
           if (code && code !== language) {
             await tx.courseLanguage.create({ data: { courseId: course.id, language: code, isSubtitle: true } });
@@ -445,8 +590,10 @@ export async function commitCourseImport(preview: CourseImportPreview, options: 
       },
       { timeout: 30_000 },
     );
-    if (isNew) created++;
-    else updated++;
+    if (isNew) {
+      created++;
+      if (status === "PENDING_REVIEW") queued++;
+    } else updated++;
 
     // A YouTube course can play here rather than sending the learner away and
     // asking for a screenshot back. Skips anything that already has modules,
@@ -460,6 +607,7 @@ export async function commitCourseImport(preview: CourseImportPreview, options: 
     if (!codes.length) continue;
     const course = await prisma.course.findUnique({ where: { code: row.data!.code } });
     if (!course) continue;
+    if (options.fillOnly && (await prisma.coursePrerequisite.count({ where: { courseId: course.id } })) > 0) continue;
     await prisma.coursePrerequisite.deleteMany({ where: { courseId: course.id } });
     for (const code of codes) {
       const prereq = await prisma.course.findUnique({ where: { code } });
@@ -472,8 +620,24 @@ export async function commitCourseImport(preview: CourseImportPreview, options: 
   return {
     created,
     updated,
+    /** Of those created, how many went to the review queue rather than live. */
+    queued,
     lessons,
     skipped: revalidated.counts.invalid + revalidated.counts.duplicates,
     verified: Boolean(options.trustLinks),
   };
+}
+
+/**
+ * The fields of `incoming` that `existing` has no value for. A null, an empty
+ * string or a missing key is a gap; anything else — including a value an
+ * administrator typed — is left exactly as it is.
+ */
+export function fillEmpty<T extends Record<string, unknown>>(existing: Record<string, unknown>, incoming: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const key of Object.keys(incoming) as (keyof T & string)[]) {
+    const current = existing[key];
+    if (current === null || current === undefined || current === "") out[key] = incoming[key];
+  }
+  return out;
 }

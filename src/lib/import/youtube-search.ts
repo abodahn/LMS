@@ -53,6 +53,9 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * the slow part of the run by design — a harvest takes a few minutes.
  */
 export async function searchWithRetry(query: string, lang: HarvestLanguage, tries = 4): Promise<Candidate[]> {
+  // Checked here, outside the retry's catch, which would otherwise swallow it
+  // and quietly return nothing after four slow attempts.
+  assertSearchScrapingAllowed();
   for (let attempt = 1; attempt <= tries; attempt++) {
     try {
       const found = await search(query, lang);
@@ -65,7 +68,31 @@ export async function searchWithRetry(query: string, lang: HarvestLanguage, trie
   return [];
 }
 
+/**
+ * Retired for new discovery, on 30 September 2026.
+ *
+ * YouTube's robots.txt disallows its /results search pages and its Terms of
+ * Service forbid accessing the service by automated means other than as a
+ * public search engine, and this function does exactly that. The courses it
+ * already found are unaffected: each is only a link, confirmed through oEmbed,
+ * which the terms do not restrict.
+ *
+ * New YouTube courses are curated instead — found by a person or through a
+ * general search engine, checked with oEmbed, and put through the review queue
+ * (data/catalog-discovery-*.csv). Running the old harvesters again needs a
+ * deliberate decision by whoever is accountable for it, which is what the
+ * environment switch below records.
+ */
+export function assertSearchScrapingAllowed() {
+  if (process.env.ALLOW_YOUTUBE_SEARCH_SCRAPING === "yes") return;
+  throw new Error(
+    "YouTube search scraping is retired: YouTube's robots.txt disallows /results and its terms forbid automated access. " +
+      "Curate YouTube courses and verify them with oEmbed instead. To run anyway, set ALLOW_YOUTUBE_SEARCH_SCRAPING=yes.",
+  );
+}
+
 async function search(query: string, lang: HarvestLanguage): Promise<Candidate[]> {
+  assertSearchScrapingAllowed();
   // sp=EgIYAg%3D%3D restricts to videos over 20 minutes: the length filter is
   // doing the quality filtering here, since a "course" is not a three-minute clip.
   const url =

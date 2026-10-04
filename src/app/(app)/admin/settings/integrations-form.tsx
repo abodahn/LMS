@@ -36,7 +36,7 @@ export function IntegrationsForm({
         <h2 className="text-base font-semibold text-[var(--brand-ink)]">{t("form.aiProvider")}</h2>
         <form action={saveAi} className="mt-4 space-y-4">
           <FormError>{msg(aiState.error)}</FormError>
-          <FormSuccess>{aiState.success === "common.saved" ? t("common.saved") : aiState.success}</FormSuccess>
+          <FormSuccess>{msg(aiState.success)}</FormSuccess>
 
           <Alert tone="info">
             {t("form.apiKeyHint")}
@@ -81,7 +81,7 @@ export function IntegrationsForm({
         <h2 className="text-base font-semibold text-[var(--brand-ink)]">{t("form.smtpEmail")}</h2>
         <form action={saveSmtp} className="mt-4 space-y-4">
           <FormError>{msg(smtpState.error)}</FormError>
-          <FormSuccess>{smtpState.success}</FormSuccess>
+          <FormSuccess>{msg(smtpState.success)}</FormSuccess>
 
           <Alert tone="info">
             {t("form.smtpHint")}
