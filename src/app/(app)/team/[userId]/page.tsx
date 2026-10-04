@@ -13,6 +13,7 @@ import { MemberActions } from "./member-actions";
 import { PlanPanel, RateControl } from "./skill-panel";
 import { SkillMatrix } from "@/components/skill-matrix";
 import { skillProfile, coursesForSkill } from "@/lib/skills";
+import { careerView } from "@/lib/careers";
 
 export const metadata: Metadata = { title: "Team member" };
 
@@ -48,6 +49,14 @@ export default async function TeamMemberPage({ params }: PageProps<"/team/[userI
   // The skills spine: what the job requires, what this person holds, and the
   // plan between the two.
   const profile = await skillProfile(userId);
+  // Readiness for the next rung, for the same development conversation the
+  // plan below is for. The member's own career page shows them the same. For a
+  // feeder role that next rung is often a critical one, so beyond the member's
+  // own manager it takes the same permission as the succession page.
+  const career =
+    isOwnReport || manager.permissions.includes("succession.view")
+      ? await careerView(userId)
+      : { next: [] as Awaited<ReturnType<typeof careerView>>["next"] };
   const goalRows = await prisma.developmentGoal.findMany({
     where: { userId, status: { not: "DROPPED" } },
     include: { skill: true },
@@ -230,6 +239,24 @@ export default async function TeamMemberPage({ params }: PageProps<"/team/[userI
 
       {isOwnReport && manager.permissions.includes("team.assess") ? (
         <PlanPanel userId={member.id} goals={goals} hasGaps={profile.gaps.length > 0} />
+      ) : null}
+
+      {career.next.length > 0 ? (
+        <Card className="p-5">
+          <h2 className="text-base font-semibold text-[var(--brand-ink)]">{t("career.nextRolesTitle")}</h2>
+          <ul className="mt-3 space-y-2">
+            {career.next.map((n) => (
+              <li key={n.jobTitle.id} className="flex flex-wrap items-baseline justify-between gap-2 text-[13px]">
+                <span className="font-medium text-[var(--brand-ink)]">{n.jobTitle.name}</span>
+                <span className="text-[var(--brand-muted)]">
+                  {n.profile.readiness === null
+                    ? t("career.noRequirements")
+                    : `${translate(dict, "career.readiness", { percent: Math.round(n.profile.readiness * 100) })} · ${translate(dict, "career.gapsCount", { count: n.profile.gaps.length })}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
       ) : null}
 
       <MemberActions

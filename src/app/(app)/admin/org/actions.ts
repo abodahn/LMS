@@ -90,6 +90,7 @@ const jobTitleSchema = z.object({
   departmentId: z.string().optional(),
   isTechnical: z.string().optional(),
   isManagerial: z.string().optional(),
+  isCritical: z.string().optional(),
 });
 
 export async function saveJobTitleAction(_prev: OrgState, formData: FormData): Promise<OrgState> {
@@ -109,6 +110,7 @@ export async function saveJobTitleAction(_prev: OrgState, formData: FormData): P
     departmentId: d.departmentId || null,
     isTechnical: !!d.isTechnical,
     isManagerial: !!d.isManagerial,
+    isCritical: !!d.isCritical,
   };
 
   const jobTitle = d.jobTitleId
@@ -123,6 +125,20 @@ export async function saveJobTitleAction(_prev: OrgState, formData: FormData): P
     entityId: jobTitle.id,
     after: data,
   });
+
+  // A title's skill requirements are derived from its family and flags, so a
+  // change here changes what the job asks of people. Recomputed now rather
+  // than at the next restart, which is when a new or edited title used to
+  // pick them up — leaving everyone in it with an empty skills matrix until
+  // then.
+  // The title itself is already saved; if this fails, the next boot recomputes
+  // it, so the admin is not shown an error for a save that happened.
+  try {
+    const { syncTitleRequirements } = await import("../../../../../prisma/seed/skills");
+    await syncTitleRequirements(prisma, jobTitle.id);
+  } catch (error) {
+    console.error("job title requirements not refreshed", error instanceof Error ? error.message : "unknown");
+  }
 
   revalidatePath("/admin/org");
   return { success: "common.saved" };

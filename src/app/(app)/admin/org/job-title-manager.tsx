@@ -19,6 +19,7 @@ type JobTitle = {
   departmentName: string | null;
   isTechnical: boolean;
   isManagerial: boolean;
+  isCritical: boolean;
   employees: number;
 };
 
@@ -129,6 +130,7 @@ export function JobTitleManager({
           <div className="grid gap-2 sm:grid-cols-2">
             <Checkbox name="isTechnical" defaultChecked={current?.isTechnical ?? false} label={t("form.technicalRole")} />
             <Checkbox name="isManagerial" defaultChecked={current?.isManagerial ?? false} label={t("form.managerialRole")} />
+            <Checkbox name="isCritical" defaultChecked={current?.isCritical ?? false} label={t("form.criticalRole")} />
           </div>
 
           <Submit />
@@ -156,7 +158,12 @@ export function JobTitleManager({
                 {j.isTechnical ? <Badge tone="info">{t("form.technical")}</Badge> : null}
                 {j.isManagerial ? (
                   <Badge tone="neutral" className="ms-1">
-                    Manager
+                    {t("form.managerBadge")}
+                  </Badge>
+                ) : null}
+                {j.isCritical ? (
+                  <Badge tone="warning" className="ms-1">
+                    {t("form.criticalBadge")}
                   </Badge>
                 ) : null}
               </td>

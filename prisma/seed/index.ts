@@ -12,6 +12,7 @@ import { seedContent } from "./content";
 import { seedDemo } from "./demo";
 import { seedSessions } from "./sessions";
 import { seedSkills } from "./skills";
+import { seedCareers } from "./careers";
 import { mapCourseSkills } from "../../src/lib/course-skill-map";
 
 const includeDemo = process.env.SEED_DEMO !== "false";
@@ -36,6 +37,7 @@ async function main() {
   await step("prompt library, use cases, capstones", () => seedContent(prisma));
   // After the org and the catalogue: requirements need job titles, and the
   // course-skill links need both skills and courses to exist.
+  await step("career ladders", () => seedCareers(prisma));
   await step("skills and job requirements", () => seedSkills(prisma));
   await step("course-skill links", () => mapCourseSkills(prisma));
 

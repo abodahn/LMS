@@ -180,8 +180,11 @@ model JobTitle {
   isManagerial Boolean     @default(false)
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id])
+  /// A role whose vacancy would stop work. Succession is tracked for these.
+  isCritical   Boolean     @default(false)
   users        User[]
   requirements JobTitleSkill[]
+  careerSteps  CareerStep[]
 }
 
 model Location {
@@ -1480,6 +1483,44 @@ model AiBudget {
   alerted80     String?
   alerted100    String?
   updatedAt     DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Careers
+// ---------------------------------------------------------------------------
+
+/**
+ * A ladder of job titles, in the order people usually climb them. A title can
+ * sit on more than one ladder: an Industrial Engineer can move towards
+ * production management or towards planning.
+ */
+model CareerPath {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  name        String
+  nameAr      String?
+  nameTr      String?
+  description String?
+  /// PRODUCTION | QUALITY | SUPPLY_CHAIN | FINANCE | HR | IT | SALES_MARKETING | MANAGEMENT | GENERAL
+  jobFamily   String  @default("GENERAL")
+  order       Int     @default(0)
+
+  steps CareerStep[]
+}
+
+model CareerStep {
+  id         String @id @default(cuid())
+  pathId     String
+  jobTitleId String
+  /// 0 is the first rung.
+  order      Int
+
+  path     CareerPath @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  jobTitle JobTitle   @relation(fields: [jobTitleId], references: [id], onDelete: Cascade)
+
+  @@unique([pathId, jobTitleId])
+  @@unique([pathId, order])
+  @@index([jobTitleId])
 }
 
 // ---------------------------------------------------------------------------

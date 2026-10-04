@@ -64,6 +64,12 @@ async function ensureVocabulary() {
   }
   if (added > 0) console.log(`[bootstrap] ${added} new course category/categories`);
 
+  // Career ladders first: they add job titles, which the skill requirements
+  // below then cover on the same boot.
+  const { seedCareers } = await import("../prisma/seed/careers");
+  const careers = await seedCareers(prisma);
+  console.log(`[bootstrap] career ladders: ${careers.ladders} written, ${careers.existing} already present`);
+
   // Skills and the levels each job expects of them. Upserts, and re-run every
   // boot for the same reason as the categories: a requirement added after the
   // first deploy has to reach a database that already exists.

@@ -337,6 +337,10 @@ const MANAGERIAL: Record<string, number> = {
 
 /** What the job itself needs. Overrides the baseline where they overlap. */
 const BY_TITLE: Record<string, Record<string, number>> = {
+  // The first rungs of the production ladder: what an operator is expected to
+  // do alone, and what a senior operator adds — teaching it to the next one.
+  "Sewing Machine Operator": { MACHINE_SETUP: 2, INLINE_QC: 2, LEAN_5S: 2, WORKPLACE_SAFETY: 3 },
+  "Senior Operator": { MACHINE_SETUP: 3, INLINE_QC: 3, LEAN_5S: 3, WORKPLACE_SAFETY: 3, ON_JOB_TRAINING: 2 },
   "Industrial Engineer": { LINE_BALANCING: 5, SMV: 5, TIME_MOTION: 5, CAPACITY_PLANNING: 4, EXCEL: 4, POWER_BI: 3 },
   "Line Leader": { LINE_BALANCING: 3, INLINE_QC: 3, ON_JOB_TRAINING: 3, TEAM_LEADERSHIP: 3, MACHINE_SETUP: 2 },
   "Production Supervisor": {
@@ -414,6 +418,34 @@ export async function seedSkills(prisma: Db) {
 
   let requirements = 0;
   for (const job of jobTitles) {
+    const writes = requirementWrites(prisma, job, byKey);
+    await prisma.$transaction(writes);
+    requirements += writes.length - 1;
+  }
+
+  return { skills: SKILLS.length, requirements };
+}
+
+type TitleShape = { id: string; name: string; jobFamily: string; isManagerial: boolean };
+
+/**
+ * One title's requirements, rewritten in a single transaction — what saving a
+ * title in /admin/org needs, without re-running the whole catalogue.
+ */
+export async function syncTitleRequirements(prisma: Db, jobTitleId: string) {
+  const [job, skills] = await Promise.all([
+    prisma.jobTitle.findUnique({
+      where: { id: jobTitleId },
+      select: { id: true, name: true, jobFamily: true, isManagerial: true },
+    }),
+    prisma.skill.findMany({ select: { id: true, key: true } }),
+  ]);
+  if (!job) return;
+  await prisma.$transaction(requirementWrites(prisma, job, new Map(skills.map((s) => [s.key, s.id]))));
+}
+
+function requirementWrites(prisma: Db, job: TitleShape, byKey: Map<string, string>) {
+  {
     const wanted: Record<string, number> = {
       ...(FAMILY_BASE[job.jobFamily] ?? {}),
       ...(job.isManagerial ? MANAGERIAL : {}),
@@ -429,20 +461,21 @@ export async function seedSkills(prisma: Db) {
     const wantedIds = Object.keys(wanted)
       .map((key) => byKey.get(key))
       .filter((id): id is string => !!id);
-    await prisma.jobTitleSkill.deleteMany({ where: { jobTitleId: job.id, skillId: { notIn: wantedIds } } });
-
-    for (const [key, requiredLevel] of Object.entries(wanted)) {
-      const skillId = byKey.get(key);
-      if (!skillId) continue; // a key that no longer exists is not a reason to fail the seed
-      const data = { requiredLevel, isCritical: requiredLevel >= CRITICAL_AT };
-      await prisma.jobTitleSkill.upsert({
-        where: { jobTitleId_skillId: { jobTitleId: job.id, skillId } },
-        update: data,
-        create: { jobTitleId: job.id, skillId, ...data },
-      });
-      requirements++;
-    }
+    return [
+      prisma.jobTitleSkill.deleteMany({ where: { jobTitleId: job.id, skillId: { notIn: wantedIds } } }),
+      // A key that no longer exists is not a reason to fail the seed.
+      ...Object.entries(wanted).flatMap(([key, requiredLevel]) => {
+        const skillId = byKey.get(key);
+        if (!skillId) return [];
+        const data = { requiredLevel, isCritical: requiredLevel >= CRITICAL_AT };
+        return [
+          prisma.jobTitleSkill.upsert({
+            where: { jobTitleId_skillId: { jobTitleId: job.id, skillId } },
+            update: data,
+            create: { jobTitleId: job.id, skillId, ...data },
+          }),
+        ];
+      }),
+    ];
   }
-
-  return { skills: SKILLS.length, requirements };
 }

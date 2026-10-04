@@ -57,6 +57,7 @@ export default async function OrgPage() {
           departmentName: j.department ? localized(j.department, "name", locale) : null,
           isTechnical: j.isTechnical,
           isManagerial: j.isManagerial,
+          isCritical: j.isCritical,
           employees: j._count.users,
         }))}
       />

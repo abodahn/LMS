@@ -13,6 +13,7 @@ export const PERMISSIONS = {
   "team.nominate": "Nominate or recommend learning for team members",
   "team.review": "Review team capstone submissions",
   "team.assess": "Rate a team member's skills and agree a development plan",
+  "succession.view": "View succession readiness for critical roles",
   // people admin
   "users.view": "View all employees",
   "users.manage": "Create, edit, deactivate employees",
@@ -60,6 +61,7 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
     "team.review",
     "team.assess",
     "users.view",
+    "succession.view",
     "users.manage",
     "users.import",
     "org.manage",

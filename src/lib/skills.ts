@@ -132,10 +132,22 @@ export async function skillProfile(userId: string): Promise<SkillProfile> {
   if (!user?.jobTitleId) {
     return { jobTitle: null, gaps: [], met: [], criticalGaps: 0, readiness: null, unrated: 0 };
   }
+  return skillProfileFor(userId, { id: user.jobTitleId, name: user.jobTitle?.name ?? null });
+}
 
+/**
+ * The same comparison against any job title, not only the one someone holds:
+ * what a career page and a succession view both need is "measured against the
+ * next role, how far is this person?" — and it has to be the identical
+ * arithmetic, or the two screens would disagree about the same person.
+ */
+export async function skillProfileFor(
+  userId: string,
+  jobTitle: { id: string; name: string | null },
+): Promise<SkillProfile> {
   const [requirements, held] = await Promise.all([
     prisma.jobTitleSkill.findMany({
-      where: { jobTitleId: user.jobTitleId, skill: { isActive: true } },
+      where: { jobTitleId: jobTitle.id, skill: { isActive: true } },
       include: { skill: true },
     }),
     prisma.userSkill.findMany({
@@ -171,7 +183,7 @@ export async function skillProfile(userId: string): Promise<SkillProfile> {
   const met = rows.filter((r) => r.gap === 0).sort((a, b) => a.name.localeCompare(b.name));
 
   return {
-    jobTitle: user.jobTitle?.name ?? null,
+    jobTitle: jobTitle.name,
     gaps,
     met,
     criticalGaps: gaps.filter((g) => g.isCritical).length,
