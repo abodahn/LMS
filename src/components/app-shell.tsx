@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import { Bell, BookOpen, LogOut, Menu, X } from "lucide-react";
 import { NavIcon } from "./nav-icon";
 import { LocaleSwitcher } from "./locale-switcher";
-import { useT } from "./i18n-provider";
+import { useI18n, useT } from "./i18n-provider";
 import { clearServiceWorkerCaches } from "./service-worker";
 import { clearOfflineQueue } from "@/lib/offline-sync";
 import { Logo } from "./brand";
@@ -180,6 +180,7 @@ function NotificationBell({ count, label }: { count: number; label: string }) {
 }
 
 function UserBlock({ user, t }: { user: ShellUser; t: (k: string) => string }) {
+  const { locale } = useI18n();
   return (
     <div className="border-t border-[var(--brand-line)] p-3">
       <div className="flex items-center gap-3 rounded-[var(--radius-control)] px-2 py-2">
@@ -200,7 +201,7 @@ function UserBlock({ user, t }: { user: ShellUser; t: (k: string) => string }) {
       </div>
       {/* A plain link: the guide is a static page, opened beside the app. */}
       <a
-        href="/guide.html"
+        href={locale === "en" ? "/guide.html" : `/guide-${locale}.html`}
         target="_blank"
         rel="noopener"
         className="mt-1 flex w-full items-center gap-3 rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-[var(--brand-charcoal)] transition-colors hover:bg-[var(--brand-canvas)]"

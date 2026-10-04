@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -63,7 +63,7 @@
     margin: 0;
     background: var(--canvas);
     color: var(--charcoal);
-    font: 15px/1.65 "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font: 15px/1.7 "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Tahoma, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -102,10 +102,10 @@
   nav.toc {
     position: sticky; top: 60px; align-self: start;
     height: calc(100vh - 60px); overflow-y: auto;
-    padding: 24px 16px 40px 20px;
-    border-right: 1px solid var(--line);
+    padding-block: 24px 40px; padding-inline: 20px 16px;
+    border-inline-end: 1px solid var(--line);
   }
-  .toc h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px 8px; font-weight: 600; }
+  .toc h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; margin-inline-start: 8px; font-weight: 600; }
   .toc ol { list-style: none; margin: 0; padding: 0; }
   .toc a {
     display: block; padding: 5px 8px; border-radius: 6px;
@@ -113,7 +113,7 @@
   }
   .toc a:hover { background: var(--surface); color: var(--ink); }
   .toc a.active { background: var(--red-soft); color: var(--red-dark); font-weight: 600; }
-  .toc ol ol a { padding-left: 20px; font-size: 13px; color: var(--muted); }
+  .toc ol ol a { padding-inline-start: 20px; font-size: 13px; color: var(--muted); }
   .toc ol ol a.active { color: var(--red-dark); }
   .toc .hidden { display: none; }
 
@@ -144,14 +144,14 @@
   section h3 { margin: 28px 0 8px; color: var(--ink); font-size: 1.12rem; line-height: 1.3; }
   section h4 { margin: 20px 0 6px; color: var(--ink); font-size: .98rem; }
   section p { margin: 0 0 12px; max-width: 78ch; }
-  section ul, section ol { margin: 0 0 14px; padding-left: 22px; max-width: 78ch; }
+  section ul, section ol { margin: 0 0 14px; padding-inline-start: 22px; max-width: 78ch; }
   section li { margin-bottom: 5px; }
   section li > ul, section li > ol { margin: 6px 0 4px; }
 
-  ol.steps { list-style: none; padding-left: 0; counter-reset: step; }
-  ol.steps > li { position: relative; padding-left: 36px; margin-bottom: 9px; counter-increment: step; }
+  ol.steps { list-style: none; padding-inline-start: 0; counter-reset: step; }
+  ol.steps > li { position: relative; padding-inline-start: 36px; margin-bottom: 9px; counter-increment: step; }
   ol.steps > li::before {
-    content: counter(step); position: absolute; left: 0; top: 1px;
+    content: counter(step); position: absolute; inset-inline-start: 0; top: 1px;
     width: 24px; height: 24px; border-radius: 50%;
     background: var(--ink); color: var(--surface); font-size: 12.5px; font-weight: 700;
     display: grid; place-items: center;
@@ -178,23 +178,32 @@
 
   .callout {
     border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; max-width: 78ch;
-    border: 1px solid var(--line); border-left-width: 4px; background: var(--canvas);
+    border: 1px solid var(--line); border-inline-start-width: 4px; background: var(--canvas);
   }
-  .callout.tip { border-left-color: var(--success); background: var(--success-soft); }
-  .callout.note { border-left-color: var(--info); background: var(--info-soft); }
-  .callout.warn { border-left-color: var(--warning); background: var(--warning-soft); }
+  .callout.tip { border-inline-start-color: var(--success); background: var(--success-soft); }
+  .callout.note { border-inline-start-color: var(--info); background: var(--info-soft); }
+  .callout.warn { border-inline-start-color: var(--warning); background: var(--warning-soft); }
   .callout strong { color: var(--ink); }
   .callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
 
   .table-wrap { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--line); border-radius: 10px; }
   table.ref { border-collapse: collapse; width: 100%; font-size: 13.5px; }
   table.ref th {
-    text-align: left; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase;
+    text-align: start; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase;
     color: var(--muted); font-weight: 600; background: var(--canvas);
     padding: 10px 12px; border-bottom: 1px solid var(--line-strong); white-space: nowrap;
   }
   table.ref td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
   table.ref tr:last-child td { border-bottom: 0; }
+
+  /* Code, addresses and settings read left to right in every language. */
+  code, kbd, .path, .perm { direction: ltr; unicode-bidi: isolate; }
+  pre { direction: ltr; text-align: left; }
+  [dir="rtl"] .toc h2, [dir="rtl"] table.ref th { letter-spacing: 0; text-transform: none; }
+
+  .langs { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--canvas); }
+  .langs a { padding: 3px 9px; border-radius: 6px; font-size: 13px; color: var(--charcoal); text-decoration: none; white-space: nowrap; }
+  .langs a[aria-current="true"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
 
   mark.hit { background: #ffe58a; color: inherit; border-radius: 2px; }
   .no-results { display: none; padding: 18px; border-radius: 10px; background: var(--surface); border: 1px dashed var(--line-strong); color: var(--muted); }
@@ -202,6 +211,7 @@
   footer { color: var(--muted); font-size: 12.5px; padding: 8px 4px 0; }
 
   @media (max-width: 960px) {
+    .langs a { padding: 3px 6px; }
     .layout { grid-template-columns: 1fr; }
     nav.toc {
       display: none; position: fixed; inset: 60px 0 0 0; height: auto; z-index: 15;
@@ -235,6 +245,7 @@
   <a class="brand" href="#top"><img src="/brand/logo-mark.svg" alt="" width="26" height="26"><span>T&amp;C AI Academy <em>· Guide</em></span></a>
   <span class="spacer"></span>
   <input class="search" type="search" placeholder="Search the guide" aria-label="Search the guide">
+  <nav class="langs" aria-label="Language"><a href="/guide.html" hreflang="en" lang="en" aria-current="true">English</a><a href="/guide-ar.html" hreflang="ar" lang="ar">العربية</a><a href="/guide-tr.html" hreflang="tr" lang="tr">Türkçe</a></nav>
   <a class="open-app" href="/">Open the academy</a>
 </header>
 
@@ -255,7 +266,7 @@
         <a href="#admin-people"><strong>Administrators</strong><span>People, catalogue, insight, settings</span></a>
         <a href="#it-integrations"><strong>IT</strong><span>Single sign-on, HR sync, API, operations</span></a>
       </div>
-      <p class="meta">Version of 5 October 2026. Screens and labels shown are the English ones; the academy is also available in Arabic and Turkish.</p>
+      <p class="meta">Version of 5 October 2026. Labels are shown as they appear in the English interface; this guide is also available in Arabic and Turkish.</p>
     </div>
 
     <p class="no-results" id="no-results">Nothing in the guide matches that search.</p>
@@ -1831,7 +1842,6 @@ npx tsx scripts/run-jobs.mts --only backup</code></pre>
   var list = document.getElementById("toc-list");
   var sections = Array.prototype.slice.call(document.querySelectorAll("main section"));
   var links = [];
-  var slug = function (s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60); };
 
   sections.forEach(function (sec) {
     var h2 = sec.querySelector("h2");
@@ -1843,8 +1853,9 @@ npx tsx scripts/run-jobs.mts --only backup</code></pre>
     var subs = sec.querySelectorAll("h3");
     if (subs.length) {
       var ol = document.createElement("ol");
-      Array.prototype.forEach.call(subs, function (h3) {
-        if (!h3.id) h3.id = sec.id + "--" + slug(h3.textContent);
+      Array.prototype.forEach.call(subs, function (h3, i) {
+        // By position, not text: the same link reaches the same place in every language.
+        if (!h3.id) h3.id = sec.id + "-" + (i + 1);
         var sli = document.createElement("li");
         var sa = document.createElement("a");
         sa.href = "#" + h3.id; sa.textContent = h3.textContent; sa.dataset.target = h3.id;
@@ -1853,6 +1864,11 @@ npx tsx scripts/run-jobs.mts --only backup</code></pre>
       li.appendChild(ol);
     }
     list.appendChild(li);
+  });
+
+  // Switching language keeps your place: anchors are the same in every version.
+  Array.prototype.forEach.call(document.querySelectorAll(".langs a"), function (a) {
+    a.addEventListener("click", function () { if (location.hash) a.href = a.getAttribute("href").split("#")[0] + location.hash; });
   });
 
   // Contents on small screens
