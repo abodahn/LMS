@@ -13,6 +13,7 @@ import {
   exchangeCode,
   OIDC_COOKIE,
   oidcConfig,
+  publicUrl,
   redirectUri,
 } from "@/lib/oidc";
 
@@ -22,9 +23,9 @@ import {
  * person has no account here) — and the detail goes to the server log only.
  */
 export async function GET(request: Request) {
-  const fail = (code: "sso" | "sso_unknown") => NextResponse.redirect(new URL(`/login?error=${code}`, request.url));
+  const fail = (code: "sso" | "sso_unknown") => NextResponse.redirect(publicUrl(`/login?error=${code}`, request));
   const cfg = oidcConfig();
-  if (!cfg) return NextResponse.redirect(new URL("/login", request.url));
+  if (!cfg) return NextResponse.redirect(publicUrl("/login", request));
 
   const jar = await cookies();
   const raw = jar.get(OIDC_COOKIE)?.value;
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
   let email: string | null;
   try {
     const doc = await discover(cfg.issuer);
-    const claims = decodeClaims(await exchangeCode(doc, cfg, code, expected.verifier, redirectUri(request.url)));
+    const claims = decodeClaims(await exchangeCode(doc, cfg, code, expected.verifier, redirectUri(request)));
     const refused = checkClaims(claims, { issuer: doc.issuer.replace(/\/+$/, ""), clientId: cfg.clientId, nonce: expected.nonce });
     if (refused) throw new Error(`id_token refused: ${refused}`);
     email = emailFrom(claims);
@@ -79,5 +80,5 @@ export async function GET(request: Request) {
     entityId: user.id,
     summary: "single sign-on",
   });
-  return NextResponse.redirect(new URL("/", request.url));
+  return NextResponse.redirect(publicUrl("/", request));
 }

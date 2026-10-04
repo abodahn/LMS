@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { authorizeUrl, discover, newAuthRequest, OIDC_COOKIE, oidcConfig, redirectUri } from "@/lib/oidc";
+import { authorizeUrl, discover, newAuthRequest, OIDC_COOKIE, oidcConfig, publicUrl, redirectUri } from "@/lib/oidc";
 
 /** Sends the browser to the identity provider, remembering what to expect back. */
 export async function GET(request: Request) {
   const cfg = oidcConfig();
-  if (!cfg) return NextResponse.redirect(new URL("/login", request.url));
+  if (!cfg) return NextResponse.redirect(publicUrl("/login", request));
 
   try {
     const doc = await discover(cfg.issuer);
@@ -21,9 +21,9 @@ export async function GET(request: Request) {
       path: "/",
       maxAge: 600,
     });
-    return NextResponse.redirect(authorizeUrl(doc, cfg, redirectUri(request.url), req));
+    return NextResponse.redirect(authorizeUrl(doc, cfg, redirectUri(request), req));
   } catch (error) {
     console.error("sso start failed", error instanceof Error ? error.message : "unknown");
-    return NextResponse.redirect(new URL("/login?error=sso", request.url));
+    return NextResponse.redirect(publicUrl("/login?error=sso", request));
   }
 }

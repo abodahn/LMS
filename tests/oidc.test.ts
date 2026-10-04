@@ -20,3 +20,19 @@ describe("id token checks", () => {
     expect(emailFrom({ preferred_username: "not-an-email" })).toBeNull();
   });
 });
+
+describe("public address", () => {
+  it("never redirects to the container's internal address", async () => {
+    const { publicUrl } = await import("@/lib/oidc");
+    const internal = new Request("http://localhost:10000/api/auth/oidc/start", {
+      headers: { "x-forwarded-host": "tc-ai-academy.onrender.com", "x-forwarded-proto": "https" },
+    });
+    const before = process.env.APP_URL;
+    delete process.env.APP_URL;
+    expect(publicUrl("/login", internal).href).toBe("https://tc-ai-academy.onrender.com/login");
+    process.env.APP_URL = "https://academy.example.com/";
+    expect(publicUrl("/login?error=sso", internal).href).toBe("https://academy.example.com/login?error=sso");
+    if (before === undefined) delete process.env.APP_URL;
+    else process.env.APP_URL = before;
+  });
+});

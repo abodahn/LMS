@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { Bell, LogOut, Menu, X } from "lucide-react";
+import { Bell, BookOpen, LogOut, Menu, X } from "lucide-react";
 import { NavIcon } from "./nav-icon";
 import { LocaleSwitcher } from "./locale-switcher";
 import { useT } from "./i18n-provider";
@@ -198,6 +198,16 @@ function UserBlock({ user, t }: { user: ShellUser; t: (k: string) => string }) {
       <div className="mt-2 flex items-center justify-between gap-2 px-1 lg:hidden">
         <LocaleSwitcher compact />
       </div>
+      {/* A plain link: the guide is a static page, opened beside the app. */}
+      <a
+        href="/guide.html"
+        target="_blank"
+        rel="noopener"
+        className="mt-1 flex w-full items-center gap-3 rounded-[var(--radius-control)] px-3 py-2 text-sm font-medium text-[var(--brand-charcoal)] transition-colors hover:bg-[var(--brand-canvas)]"
+      >
+        <BookOpen size={18} strokeWidth={1.9} className="text-[var(--brand-muted)]" />
+        {t("nav.guide")}
+      </a>
       <form
         action={logoutAction}
         className="mt-1"
