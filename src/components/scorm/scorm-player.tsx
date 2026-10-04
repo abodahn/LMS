@@ -23,6 +23,11 @@ import { commitScormAction } from "@/app/(app)/learn/scorm-actions";
  * because packages are routinely mislabelled and content that finds neither
  * simply fails.
  *
+ * With a separate content hostname (`bridge`), none of that runs here: the
+ * package loads on that hostname inside a bridge page which owns the API and
+ * relays writes to this component by postMessage. This component then only
+ * listens — to that origin and that frame — and saves exactly as below.
+ *
  * Both are synchronous by specification: `LMSGetValue` must return a string
  * immediately, so nothing here can await the server. The CMI map is held in
  * memory and flushed on commit, on finish, on a timer and on page hide — which
@@ -37,6 +42,8 @@ type Props = {
   launchUrl: string;
   initialCmi: CmiMap;
   title: string;
+  /** Separate content hostname: where the bridge page is, and its origin. */
+  bridge?: { origin: string; url: string };
 };
 
 const NO_ERROR = "0";
@@ -49,12 +56,15 @@ const ERROR_TEXT: Record<string, string> = {
   [ELEMENT_READ_ONLY]: "Element is read only",
 };
 
-export function ScormPlayer({ packageId, enrollmentId, launchUrl, initialCmi, title }: Props) {
+export function ScormPlayer({ packageId, enrollmentId, launchUrl, initialCmi, title, bridge }: Props) {
   const t = useT();
   const [message, setMessage] = useState("");
   const [failed, setFailed] = useState(false);
 
   const frame = useRef<HTMLIFrameElement>(null);
+  // Strings, not the object, so a re-render with equal props does not restart the runtime.
+  const bridgeUrl = bridge?.url;
+  const bridgeOrigin = bridge?.origin;
   // Refs rather than state throughout: the API is called synchronously from
   // another frame and must never read a stale render.
   const cmi = useRef<CmiMap>({ ...initialCmi });
@@ -159,11 +169,31 @@ export function ScormPlayer({ packageId, enrollmentId, launchUrl, initialCmi, ti
     };
 
     const w = window as unknown as Record<string, unknown>;
-    w.API = api12;
-    w.API_1484_11 = api2004;
+    const onMessage = (e: MessageEvent) => {
+      if (!bridgeOrigin || e.origin !== bridgeOrigin || e.source !== frame.current?.contentWindow) return;
+      const m = e.data as { scorm?: string; key?: string; value?: string };
+      if (m?.scorm === "ready") {
+        frame.current?.contentWindow?.postMessage({ scorm: "init", cmi: cmi.current }, bridgeOrigin);
+      } else if (m?.scorm === "initialize") {
+        initialize();
+      } else if (m?.scorm === "set" && typeof m.key === "string") {
+        initialised.current = true;
+        set(m.key, m.value ?? "");
+      } else if (m?.scorm === "commit") {
+        commit();
+      } else if (m?.scorm === "finish") {
+        finish();
+      }
+    };
+    if (bridgeUrl) {
+      window.addEventListener("message", onMessage);
+    } else {
+      w.API = api12;
+      w.API_1484_11 = api2004;
+    }
 
     // Only now is it safe to let the package load.
-    if (frame.current && !frame.current.src) frame.current.src = launchUrl;
+    if (frame.current && !frame.current.src) frame.current.src = bridgeUrl ?? launchUrl;
 
     // Content that never calls Commit still gets saved.
     const timer = setInterval(() => void flush(), 60_000);
@@ -176,11 +206,12 @@ export function ScormPlayer({ packageId, enrollmentId, launchUrl, initialCmi, ti
       disposed = true;
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("message", onMessage);
       void flush();
       delete w.API;
       delete w.API_1484_11;
     };
-  }, [packageId, enrollmentId, launchUrl, t]);
+  }, [packageId, enrollmentId, launchUrl, bridgeUrl, bridgeOrigin, t]);
 
   return (
     <div className="space-y-2">

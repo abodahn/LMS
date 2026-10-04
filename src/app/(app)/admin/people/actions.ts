@@ -32,6 +32,21 @@ const userSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE", "INVITED"]),
 });
 
+/**
+ * Roles that decide what everyone else may do. Granting or removing one, or
+ * editing, resetting or deactivating someone who holds one, takes
+ * `roles.manage` (Super Admin) — otherwise a Learning Admin could make
+ * themselves Super Admin, or reset a Super Admin's password and sign in as them.
+ */
+const PRIVILEGED = ["ADMIN", "SUPER_ADMIN"];
+
+async function touchesPrivileged(admin: { permissions: string[] }, userId?: string, roles: string[] = []) {
+  if (admin.permissions.includes("roles.manage")) return false;
+  if (roles.some((r) => PRIVILEGED.includes(r))) return true;
+  if (!userId) return false;
+  return (await prisma.userRole.count({ where: { userId, role: { key: { in: PRIVILEGED } } } })) > 0;
+}
+
 export async function saveUserAction(_prev: PeopleState, formData: FormData): Promise<PeopleState> {
   const admin = await requirePermission("users.manage");
   const parsed = userSchema.safeParse(Object.fromEntries(formData));
@@ -39,6 +54,7 @@ export async function saveUserAction(_prev: PeopleState, formData: FormData): Pr
 
   const roles = formData.getAll("roles").map(String).filter((r) => (ROLE_KEYS as readonly string[]).includes(r));
   const d = parsed.data;
+  if (await touchesPrivileged(admin, d.userId || undefined, roles)) return { error: "errors.forbidden" };
   const data = {
     employeeCode: d.employeeCode,
     fullName: d.fullName,
@@ -88,6 +104,7 @@ export async function saveUserAction(_prev: PeopleState, formData: FormData): Pr
 
 export async function setUserStatusAction(userId: string, status: "ACTIVE" | "INACTIVE") {
   const admin = await requirePermission("users.manage");
+  if (await touchesPrivileged(admin, userId)) return;
   const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   await prisma.user.update({ where: { id: userId }, data: { status } });
   if (status === "INACTIVE") {
@@ -108,6 +125,7 @@ export async function setUserStatusAction(userId: string, status: "ACTIVE" | "IN
 
 export async function resetUserPasswordAction(userId: string): Promise<PeopleState> {
   const admin = await requirePermission("users.manage");
+  if (await touchesPrivileged(admin, userId)) return { error: "errors.forbidden" };
   const password = randomPassword();
   await prisma.user.update({
     where: { id: userId },
@@ -178,7 +196,7 @@ export async function commitImportAction(_prev: ImportState, formData: FormData)
 
   // Re-validate server-side: the browser's verdict is never trusted.
   const preview = await validateEmployeeRows(parsed.headers, parsed.rows);
-  const result = await commitEmployeeImport(preview, defaultPassword);
+  const result = await commitEmployeeImport(preview, defaultPassword, admin.permissions.includes("roles.manage"));
 
   await audit({
     actorId: admin.id,

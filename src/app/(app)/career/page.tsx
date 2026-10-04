@@ -128,7 +128,7 @@ export default async function CareerPage() {
                             {suggested.slice(0, 2).map((c) => (
                               <Link
                                 key={c.id}
-                                href={`/catalog/${c.slug}`}
+                                href={`/catalog?q=${encodeURIComponent(c.title)}`}
                                 className="truncate text-[var(--brand-info)] underline underline-offset-2"
                               >
                                 {localized(c, "title", locale)} · {formatHours(c.estimatedHours)}

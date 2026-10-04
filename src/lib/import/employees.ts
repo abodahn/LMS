@@ -191,7 +191,12 @@ export async function validateEmployeeRows(headers: string[], rows: ParsedRow[])
 }
 
 /** Commits only the rows the preview marked as importable. */
-export async function commitEmployeeImport(preview: ImportPreview, defaultPassword: string) {
+/**
+ * `canTouchPrivileged`: whether the importer may update people who hold an
+ * Admin or Super Admin role. Without it those rows are skipped — a sheet must
+ * not be a way to change an administrator's email and then reset into it.
+ */
+export async function commitEmployeeImport(preview: ImportPreview, defaultPassword: string, canTouchPrivileged = false) {
   const importable = preview.rows.filter((r) => (r.status === "NEW" || r.status === "EXISTING") && r.data);
   const passwordHash = await hashPassword(defaultPassword);
   const employeeRole = await prisma.role.findUnique({ where: { key: "EMPLOYEE" } });
@@ -224,7 +229,13 @@ export async function commitEmployeeImport(preview: ImportPreview, defaultPasswo
       status: "ACTIVE",
     };
 
-    const existing = await prisma.user.findUnique({ where: { employeeCode: d.employeeCode } });
+    const existing = await prisma.user.findUnique({
+      where: { employeeCode: d.employeeCode },
+      include: { roles: { include: { role: { select: { key: true } } } } },
+    });
+    if (existing && !canTouchPrivileged && existing.roles.some((r) => ["ADMIN", "SUPER_ADMIN"].includes(r.role.key))) {
+      continue;
+    }
 
     const user = existing
       ? await prisma.user.update({ where: { id: existing.id }, data: base })

@@ -22,6 +22,7 @@ import { LOCALE_COOKIE } from "@/lib/locale";
 import { isLocale } from "@/lib/i18n";
 import { sendMail } from "@/lib/mailer";
 import { rateLimit } from "@/lib/rate-limit";
+import { oidcConfig } from "@/lib/oidc";
 
 export type ActionState = { error?: string; success?: string };
 
@@ -238,6 +239,10 @@ export async function registerAction(_prev: ActionState, formData: FormData): Pr
     return { error: "auth.tooManyAttempts" };
   }
 
+  // With single sign-on the identity provider proves who someone is; a form
+  // that only checks an employee code and an email address cannot.
+  if (oidcConfig()) return { error: "auth.registerUseSso" };
+
   if (password !== confirm) return { error: "auth.passwordsDoNotMatch" };
   if (!passwordRule.safeParse(password).success) return { error: "auth.passwordTooWeak" };
 
@@ -246,9 +251,11 @@ export async function registerAction(_prev: ActionState, formData: FormData): Pr
   });
 
   // An account can be claimed once: never signed in, and still carrying the
-  // placeholder credentials the import gave it.
+  // placeholder credentials the import gave it. Never one that was switched
+  // off — a leaver is not reinstated by knowing their own email address.
   const claimable =
     !!user &&
+    user.status !== "INACTIVE" &&
     user.lastLoginAt === null &&
     (user.mustChangePassword || user.status === "INVITED") &&
     user.email.toLowerCase() === email;
@@ -274,7 +281,7 @@ export async function registerAction(_prev: ActionState, formData: FormData): Pr
       passwordHash: await hashPassword(password),
       // Claimed: they chose this password, so there is nothing to force.
       mustChangePassword: false,
-      status: "ACTIVE",
+      ...(user.status === "INVITED" ? { status: "ACTIVE" } : {}),
       failedLoginCount: 0,
       lockedUntil: null,
     },

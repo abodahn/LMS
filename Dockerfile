@@ -61,4 +61,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # Migrations first, so a new image can never serve an old schema; then the
 # bootstrap, which seeds reference data only when the database is empty. Both
 # are idempotent, so a restart loop is harmless.
-CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx scripts/bootstrap.mts && npm run start"]
+CMD ["sh", "-c", "npx tsx scripts/restore.mts --boot && npx prisma migrate deploy && npx tsx scripts/bootstrap.mts && npm run start"]

@@ -18,6 +18,7 @@ import { SETTING_KEYS } from "@/lib/constants";
 import { StartAssessmentButton } from "@/app/(app)/assessments/start-button";
 import { extractYouTubeId, youTubeEmbedUrl } from "@/lib/youtube";
 import { ScormPlayer } from "@/components/scorm/scorm-player";
+import { scormOrigin, signLaunch } from "@/lib/scorm/origin";
 import { scormSnapshot } from "@/lib/scorm/service";
 
 export const metadata: Metadata = { title: "Lesson" };
@@ -132,6 +133,12 @@ export default async function LessonPage({ params }: PageProps<"/learn/[enrollme
                   .join("/")}`}
                 initialCmi={scorm.cmi}
                 title={localized(lesson, "title", locale)}
+                bridge={(() => {
+                  const origin = scormOrigin();
+                  return origin
+                    ? { origin, url: `${origin}/api/scorm/${lesson.scorm.id}/${signLaunch(lesson.scorm.id, user.id)}/~bridge` }
+                    : undefined;
+                })()}
               />
             ) : null}
 

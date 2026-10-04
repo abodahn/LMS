@@ -28,7 +28,11 @@
     "catalog:platforms": "tsx scripts/seed-platform-courses.mts",
     "jobs:run": "tsx scripts/run-jobs.mts",
     "jobs:status": "tsx scripts/run-jobs.mts --status",
-    "catalog:lessons": "tsx scripts/backfill-lessons.mts"
+    "catalog:lessons": "tsx scripts/backfill-lessons.mts",
+    "db:backup": "tsx scripts/run-jobs.mts --force --only backup",
+    "db:restore-check": "tsx scripts/restore.mts --check",
+    "db:restore": "tsx scripts/restore.mts",
+    "load-test": "tsx scripts/load-test.mts"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.1",

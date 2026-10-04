@@ -1,5 +1,6 @@
 import {
   Trophy,
+  Webhook,
   Award,
   BarChart3,
   Briefcase,
@@ -56,6 +57,7 @@ const ICONS = {
   "calendar-days": CalendarDays,
   cpu: Cpu,
   trophy: Trophy,
+  webhook: Webhook,
 } as const;
 
 export type IconName = keyof typeof ICONS;

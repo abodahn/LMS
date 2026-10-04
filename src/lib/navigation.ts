@@ -65,6 +65,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/succession", labelKey: "admin.succession", icon: "users", permission: "succession.view" },
   { href: "/admin/challenges", labelKey: "admin.challenges", icon: "trophy", permission: "engagement.manage" },
   { href: "/admin/ai", labelKey: "admin.aiUsage", icon: "cpu", permission: "analytics.executive" },
+  { href: "/admin/api", labelKey: "admin.integrations", icon: "webhook", permission: "integrations.manage" },
   { href: "/admin/settings", labelKey: "admin.settings", icon: "settings", permission: "settings.manage" },
   { href: "/admin/audit", labelKey: "admin.audit", icon: "scroll-text", permission: "audit.view" },
 ];

@@ -1128,6 +1128,52 @@ model ChallengeEntrant {
   @@index([userId])
 }
 
+/// A key for the read-only API. Only its SHA-256 is kept; the key is shown once.
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  /// The first characters, so keys can be told apart in the list.
+  prefix      String
+  keyHash     String    @unique
+  createdById String?
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+}
+
+/// Somewhere to tell when something happens. The secret signs each delivery.
+model Webhook {
+  id          String   @id @default(cuid())
+  url         String
+  secret      String
+  /// Comma-separated event names.
+  events      String
+  isActive    Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  deliveries WebhookDelivery[]
+}
+
+/// The outbox: written before sending, retried until delivered or given up.
+model WebhookDelivery {
+  id            String    @id @default(cuid())
+  webhookId     String
+  event         String
+  payload       String
+  status        String    @default("PENDING") // PENDING | DELIVERED | FAILED
+  attempts      Int       @default(0)
+  lastError     String?
+  nextAttemptAt DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  deliveredAt   DateTime?
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([webhookId, createdAt])
+}
+
 model Notification {
   id        String    @id @default(cuid())
   userId    String

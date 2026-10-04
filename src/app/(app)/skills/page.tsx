@@ -92,7 +92,7 @@ export default async function SkillsPage() {
                     {g.courses.map((c) => (
                       <li key={c.id} className="text-[12px]">
                         <Link
-                          href={`/catalog/${c.slug}`}
+                          href={`/catalog?q=${encodeURIComponent(localized(c, "title", locale))}`}
                           className="text-[var(--brand-ink)] underline underline-offset-2 hover:text-[var(--brand-red)]"
                         >
                           {localized(c, "title", locale)}

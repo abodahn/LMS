@@ -70,6 +70,7 @@ export default async function EditUserPage({ params }: PageProps<"/admin/people/
         }}
         {...options}
         canManage={admin.permissions.includes("users.manage")}
+        canGrantPrivileged={admin.permissions.includes("roles.manage")}
       />
 
       <div className="grid gap-5 lg:grid-cols-2">

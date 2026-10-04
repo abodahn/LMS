@@ -6,8 +6,27 @@ import { getCertificationPolicy } from "./settings";
 import { branding } from "./branding";
 import { audit } from "./audit";
 import { notify } from "./notifications";
+import { emit } from "./webhooks";
 
 /** TCAI-2026-000001 — sequential within the year, unique across the system. */
+async function emitCertificate(id: string) {
+  const c = await prisma.certificate.findUnique({
+    where: { id },
+    include: { user: { select: { id: true, employeeCode: true, email: true } } },
+  });
+  if (!c) return;
+  await emit("certificate.issued", {
+    certificateId: c.id,
+    code: c.code,
+    type: c.type,
+    title: c.title,
+    courseId: c.courseId,
+    issuedAt: c.issuedAt.toISOString(),
+    expiresAt: c.expiresAt?.toISOString() ?? null,
+    employee: c.user,
+  });
+}
+
 export async function nextCertificateCode() {
   const year = new Date().getFullYear();
   const prefix = `TCAI-${year}-`;
@@ -59,6 +78,7 @@ export async function issueCourseCertificate(userId: string, enrollmentId: strin
     link: "/certificates",
   });
   await audit({ actorId: userId, action: "CERTIFICATE_ISSUE", entity: "Certificate", entityId: certificate.id });
+  await emitCertificate(certificate.id);
   return certificate;
 }
 
@@ -156,6 +176,7 @@ export async function issueProgramCertificate(userId: string) {
     link: "/certificates",
   });
   await audit({ actorId: userId, action: "CERTIFICATE_ISSUE", entity: "Certificate", entityId: certificate.id });
+  await emitCertificate(certificate.id);
   return certificate;
 }
 

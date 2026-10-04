@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { STORAGE_ROOT } from "@/lib/storage-root";
 import { safeEntryPath } from "@/lib/scorm/paths";
+import { bridgeHtml, isScormHost, scormOrigin, verifyLaunch } from "@/lib/scorm/origin";
 
 /**
  * Serves the files of an unpacked SCORM package.
@@ -13,10 +14,13 @@ import { safeEntryPath } from "@/lib/scorm/paths";
  * belongs to or able to manage the catalogue — an administrator has to be able
  * to preview a package before assigning it to anyone.
  *
- * This content is same-origin by necessity (see lib/scorm/package.ts), so the
- * response headers do the containment that an origin boundary would otherwise
- * do: no sniffing, no framing by anyone else, no referrer leakage, and a CSP
- * that stops a package phoning home or loading anything from outside itself.
+ * With SCORM_CONTENT_ORIGIN configured (lib/scorm/origin.ts) packages are
+ * served only on that second hostname, admitted by a signed launch segment
+ * instead of the session cookie, which does not reach that hostname at all.
+ * Without it they are same-origin, as before. Either way the response headers
+ * contain what they can: no sniffing, no framing by anyone else, no referrer
+ * leakage, and a CSP that stops a package phoning home or loading anything
+ * from outside itself.
  */
 
 const TYPES: Record<string, string> = {
@@ -67,24 +71,65 @@ const CSP = [
   "base-uri 'self'",
 ].join("; ");
 
-export async function GET(_request: Request, { params }: RouteContext<"/api/scorm/[packageId]/[...path]">) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+function appOrigin() {
+  const app = process.env.APP_URL?.replace(/\/+$/, "").trim();
+  return app ? new URL(app).origin : "'none'";
+}
 
-  const { packageId, path: segments } = await params;
+export async function GET(request: Request, { params }: RouteContext<"/api/scorm/[packageId]/[...path]">) {
+  const { packageId, path: all } = await params;
+  const notFound = () => NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+
+  // Separate hostname configured: the token is the only way in, and only there.
+  const separate = scormOrigin();
+  let userId: string | null;
+  let canManage = false;
+  let segments = all;
+  if (separate) {
+    if (!isScormHost(request.headers)) return notFound();
+    userId = verifyLaunch(all[0] ?? "", packageId);
+    if (!userId) return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+    segments = all.slice(1);
+    const holder = await prisma.user.findFirst({ where: { id: userId, deletedAt: null, status: "ACTIVE" } });
+    if (!holder) return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+  } else {
+    const user = await getSessionUser();
+    if (!user) return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+    userId = user.id;
+    canManage = user.permissions.includes("catalog.manage");
+  }
 
   const pkg = await prisma.scormPackage.findUnique({
     where: { id: packageId },
-    select: { storagePath: true, lesson: { select: { module: { select: { courseId: true } } } } },
+    select: { storagePath: true, entryHref: true, lesson: { select: { module: { select: { courseId: true } } } } },
   });
-  if (!pkg) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  if (!pkg) return notFound();
 
+  // A signed launch was issued only to someone allowed to open the lesson
+  // (an enrolled learner, or a catalogue manager previewing it), so on the
+  // separate hostname the signature is the permission check.
   const allowed =
-    user.permissions.includes("catalog.manage") ||
+    !!separate ||
+    canManage ||
     (await prisma.enrollment.count({
-      where: { userId: user.id, courseId: pkg.lesson.module.courseId },
+      where: { userId, courseId: pkg.lesson.module.courseId },
     })) > 0;
   if (!allowed) return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+
+  if (separate && segments.length === 1 && segments[0] === "~bridge") {
+    const app = (process.env.APP_URL?.replace(/\/+$/, "") || "").trim();
+    if (!app) return notFound();
+    return new NextResponse(bridgeHtml(new URL(app).origin, pkg.entryHref.split("/").map(encodeURIComponent).join("/")), {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "no-referrer",
+        // Embedded only by the academy itself; the bridge script is ours.
+        "content-security-policy": `default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-ancestors ${new URL(app).origin}; base-uri 'none'; form-action 'none'`,
+      },
+    });
+  }
 
   const root = path.resolve(STORAGE_ROOT, pkg.storagePath);
   let file: string;
@@ -103,7 +148,9 @@ export async function GET(_request: Request, { params }: RouteContext<"/api/scor
         "cache-control": "private, max-age=3600",
         "x-content-type-options": "nosniff",
         "referrer-policy": "no-referrer",
-        "content-security-policy": CSP,
+        // In bridge mode the content's ancestors are the bridge (same host)
+        // and the academy page above it; frame-ancestors checks every one.
+        "content-security-policy": separate ? CSP.replace("frame-ancestors 'self'", `frame-ancestors 'self' ${appOrigin()}`) : CSP,
       },
     });
   } catch {

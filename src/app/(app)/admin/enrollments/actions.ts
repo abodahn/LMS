@@ -8,6 +8,7 @@ import { audit } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
 import { issueCourseCertificate } from "@/lib/certificates";
 import { awardBadges } from "@/lib/badges";
+import { courseCompleted } from "@/lib/webhooks";
 import { assignCourse, AUDIENCES } from "@/lib/assignments";
 import { canComplete } from "@/lib/completion-rule";
 
@@ -175,6 +176,7 @@ export async function reviewProofAction(_prev: EnrollmentState, formData: FormDa
   if (completes) {
     await issueCourseCertificate(proof.enrollment.userId, proof.enrollmentId);
     await awardBadges(proof.enrollment.userId);
+    if (proof.enrollment.status !== "COMPLETED") await courseCompleted(proof.enrollmentId);
   }
 
   await notify(proof.enrollment.userId, {

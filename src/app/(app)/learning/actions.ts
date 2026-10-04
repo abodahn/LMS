@@ -106,7 +106,9 @@ export async function saveLessonProgressAction(input: z.infer<typeof lessonSchem
     await recordActivity(user.id, (parsed.data.secondsSpent ?? 0) / 60, !wasComplete && nowComplete ? 1 : 0);
     const updated = await recalcEnrollmentProgress(enrollment.id);
 
-    if (updated?.status === "COMPLETED") {
+    // Only on the step into COMPLETED: saving progress on a course that was
+    // already finished must not notify, certify or announce it again.
+    if (updated?.status === "COMPLETED" && enrollment.status !== "COMPLETED") {
       await onCourseCompleted(user.id, enrollment.id);
     }
 

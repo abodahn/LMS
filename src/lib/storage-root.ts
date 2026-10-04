@@ -9,3 +9,6 @@ import path from "node:path";
  * request-scoped module in behind it.
  */
 export const STORAGE_ROOT = path.resolve(process.env.STORAGE_DIR ?? "./storage");
+
+/** Nightly database copies (lib/backup.ts). Here so the restore script can find them without opening the database. */
+export const BACKUP_DIR = path.join(STORAGE_ROOT, "backups");

@@ -148,7 +148,7 @@ export function PlanPanel({
                 <ul className="mt-2 space-y-1">
                   {g.courses.map((c) => (
                     <li key={c.id} className="text-[12px] text-[var(--brand-muted)]">
-                      <a className="underline hover:text-[var(--brand-ink)]" href={`/catalog/${c.slug}`}>
+                      <a className="underline hover:text-[var(--brand-ink)]" href={`/catalog?q=${encodeURIComponent(c.title)}`}>
                         {c.title}
                       </a>{" "}
                       · {c.hours}

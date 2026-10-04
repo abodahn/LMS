@@ -10,7 +10,7 @@ import { loadUserFormOptions } from "../user-data";
 export const metadata: Metadata = { title: "New employee" };
 
 export default async function NewUserPage() {
-  await requirePermission("users.manage");
+  const admin = await requirePermission("users.manage");
   const { dict, locale } = await getI18n();
   const t = (k: string) => translate(dict, k);
   const options = await loadUserFormOptions(locale);
@@ -24,7 +24,7 @@ export default async function NewUserPage() {
         ← {t("admin.people")}
       </Link>
       <SectionHeading title={t("common.create")} subtitle={t("admin.people")} />
-      <UserForm {...options} canManage />
+      <UserForm {...options} canManage canGrantPrivileged={admin.permissions.includes("roles.manage")} />
     </div>
   );
 }

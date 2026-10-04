@@ -167,6 +167,59 @@
     "REGULAR": "I use them most weeks",
     "ADVANCED": "I use them daily and build workflows"
   },
+  "api": {
+    "title": "Integrations",
+    "intro": "How the academy connects to other systems: sign-in, HR sync, the API and webhooks.",
+    "connections": "Connections set on the server",
+    "env": {
+      "sso": {
+        "name": "Single sign-on (OpenID Connect)",
+        "how": "Set OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET on the server."
+      },
+      "scim": {
+        "name": "HR sync (SCIM 2.0) at /api/scim/v2",
+        "how": "Set SCIM_TOKEN on the server and give the same token to the HR system or identity provider."
+      },
+      "scorm": {
+        "name": "SCORM on its own hostname",
+        "how": "Set SCORM_CONTENT_ORIGIN and SCORM_TOKEN_SECRET before accepting packages from outside suppliers."
+      }
+    },
+    "on": "On",
+    "off": "Off",
+    "keysTitle": "API keys",
+    "keysIntro": "Read-only access to /api/v1/users, /api/v1/completions and /api/v1/certificates. Send the key as a Bearer token.",
+    "keyName": "Name",
+    "keyNameHint": "Which system will use it, e.g. Payroll",
+    "createKey": "Create key",
+    "keyCreated": "Key created.",
+    "keyRevoked": "Key revoked.",
+    "copyNow": "Copy this now. It will not be shown again.",
+    "revoke": "Revoke",
+    "revoked": "Revoked",
+    "revokedOn": "Revoked {date}",
+    "lastUsed": "Last used {date}",
+    "neverUsed": "Not used yet",
+    "webhooksTitle": "Webhooks",
+    "webhooksIntro": "The academy posts to these addresses when something happens. Each delivery is signed with the webhook's secret and retried if it fails.",
+    "webhookUrl": "Address",
+    "webhookUrlHint": "Must start with https://",
+    "events": "Send when",
+    "event": {
+      "course_completed": "A course is completed",
+      "certificate_issued": "A certificate is issued"
+    },
+    "addWebhook": "Add webhook",
+    "webhookCreated": "Webhook added. Use the secret below to verify signatures.",
+    "badUrl": "Enter a full https:// address.",
+    "noEvents": "Choose at least one event.",
+    "confirmRemove": "Remove the webhook to {host}? Its delivery history goes with it.",
+    "delivery": {
+      "PENDING": "Retrying",
+      "DELIVERED": "Delivered",
+      "FAILED": "Failed"
+    }
+  },
   "assessment": {
     "title": "AI Placement Assessment",
     "questionOf": "Question {current} of {total}",
@@ -238,6 +291,7 @@
     "registerLink": "Create your account",
     "registerRefused": "We could not set up an account with those details. Check your employee ID and work email — and if you have signed in before, use Sign in instead. Ask HR if the problem continues.",
     "registerSubtitle": "For employees already added by HR. Enter your employee ID and work email, then choose a password.",
+    "registerUseSso": "Your company signs in with single sign-on. Use the sign-in button on the sign-in page instead.",
     "resetInvalid": "This reset link is no longer valid. Please request a new one.",
     "resetSent": "If that account exists, a reset link is on its way.",
     "resetSuccess": "Your password has been updated. You can sign in now.",
@@ -245,6 +299,11 @@
     "signIn": "Sign in",
     "signInSubtitle": "Your personalised journey to practical AI skills.",
     "signingIn": "Signing in…",
+    "ssoButton": "Sign in with {provider}",
+    "ssoDefault": "your company account",
+    "ssoFailed": "Single sign-on did not complete. Try again, or sign in with your password.",
+    "ssoOr": "or sign in with your employee code and password",
+    "ssoUnknown": "Your company account is not linked to an active academy account. Please contact HR.",
     "tooManyAttempts": "Too many attempts. Please wait a few minutes and try again.",
     "welcomeBack": "Welcome Back",
     "workEmail": "Work email",

@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { courseCompleted } from "./webhooks";
 import { notify } from "./notifications";
 import { recalcEnrollmentProgress } from "./learner";
 import { creditHours } from "./session-hours";
@@ -200,6 +201,7 @@ export async function markAttendance(sessionId: string, marks: AttendanceMark[],
       },
     });
     await recalcEnrollmentProgress(enrollment.id);
+    if (enrollment.status !== "COMPLETED") await courseCompleted(enrollment.id);
     completed++;
 
     await notify(mark.userId, {

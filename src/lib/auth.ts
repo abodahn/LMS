@@ -7,7 +7,13 @@ import { prisma } from "./db";
 import { permissionsForRoles, primaryRole, type PermissionKey } from "./rbac";
 import type { Locale } from "./constants";
 
-export const SESSION_COOKIE = "tcai_session";
+/**
+ * `__Host-` in production: the browser then refuses any version of this cookie
+ * set with a Domain attribute or from another host, so a package running on a
+ * sibling hostname (see lib/scorm/origin.ts) cannot plant or shadow a session.
+ * The prefix needs Secure, which plain-http development does not have.
+ */
+export const SESSION_COOKIE = process.env.NODE_ENV === "production" ? "__Host-tcai_session" : "tcai_session";
 
 export type SessionUser = {
   id: string;

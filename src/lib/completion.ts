@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { notifyTranslated } from "./notifications";
 import { issueCourseCertificate } from "./certificates";
 import { awardBadges } from "./badges";
+import { courseCompleted } from "./webhooks";
 
 /**
  * What happens when a course is finished, whichever route finished it.
@@ -26,6 +27,7 @@ export async function onCourseCompleted(userId: string, enrollmentId: string) {
     params: { course: { row: enrollment.course, field: "title" } },
     link: `/learning/${enrollmentId}`,
   });
+  await courseCompleted(enrollmentId);
   await issueCourseCertificate(userId, enrollmentId);
   await awardBadges(userId);
 }

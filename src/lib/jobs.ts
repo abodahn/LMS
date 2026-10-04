@@ -5,6 +5,8 @@ import { sweepCourseLinks } from "./links";
 import { runRecurringAssignments } from "./assignments";
 import { recomputeQualityScores } from "./quality";
 import { audit } from "./audit";
+import { retryDueDeliveries } from "./webhooks";
+import { backupDatabase } from "./backup";
 
 /**
  * The scheduled work the academy needs in order to look after itself.
@@ -19,7 +21,7 @@ import { audit } from "./audit";
  * jobs, and a key/value store already exists for exactly this kind of state.
  */
 
-export type JobKey = "reminders" | "linkSweep" | "recurringAssignments" | "qualityScores";
+export type JobKey = "reminders" | "linkSweep" | "recurringAssignments" | "qualityScores" | "webhooks" | "backup";
 
 type Job = {
   key: JobKey;
@@ -84,6 +86,24 @@ export const JOBS: Job[] = [
       return `${r.considered} course(s) with evidence, ${r.updated} score(s) changed`;
     },
   },
+  {
+    key: "webhooks",
+    // Every tick: a failed delivery's next try is minutes away, not a day.
+    everyHours: 0,
+    label: "Webhook retries",
+    // Silent when there was nothing to send, or the audit log would gain an
+    // empty line every fifteen minutes.
+    run: async () => {
+      const n = await retryDueDeliveries();
+      return n ? `${n} delivery attempt(s)` : "";
+    },
+  },
+  {
+    key: "backup",
+    everyHours: 24,
+    label: "Database backup",
+    run: backupDatabase,
+  },
 ];
 
 export type JobOutcome = { key: JobKey; ran: boolean; detail: string; ms: number };
@@ -134,7 +154,7 @@ export async function runDueJobs(options: { force?: boolean; only?: JobKey } = {
       const detail = await job.run();
       await setSetting(LAST_RUN(job.key), new Date().toISOString());
       outcomes.push({ key: job.key, ran: true, detail, ms: Date.now() - started });
-      await audit({
+      if (detail) await audit({
         actorName: "scheduler",
         action: "JOB_RUN",
         entity: "Job",

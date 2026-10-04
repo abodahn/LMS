@@ -38,6 +38,7 @@ export function UserForm({
   locations,
   managers,
   canManage,
+  canGrantPrivileged = false,
 }: {
   user?: {
     id: string;
@@ -59,6 +60,8 @@ export function UserForm({
   locations: Option[];
   managers: Option[];
   canManage: boolean;
+  /** Super Admin only: the Admin and Super Admin roles can be granted or removed. */
+  canGrantPrivileged?: boolean;
 }) {
   const t = useT();
   const msg = useMessage();
@@ -189,6 +192,7 @@ export function UserForm({
                   name="roles"
                   value={r}
                   defaultChecked={user ? user.roles.includes(r) : r === "EMPLOYEE"}
+                  disabled={!canGrantPrivileged && (r === "ADMIN" || r === "SUPER_ADMIN")}
                   label={r.replace(/_/g, " ")}
                 />
               ))}

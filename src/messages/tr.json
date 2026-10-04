@@ -167,6 +167,59 @@
     "REGULAR": "Çoğu hafta kullanıyorum",
     "ADVANCED": "Her gün kullanıyorum ve iş akışı kuruyorum"
   },
+  "api": {
+    "title": "Entegrasyonlar",
+    "intro": "Akademinin diğer sistemlere nasıl bağlandığı: oturum açma, İK senkronizasyonu, API ve webhook'lar.",
+    "connections": "Sunucuda ayarlanan bağlantılar",
+    "env": {
+      "sso": {
+        "name": "Tek oturum açma (OpenID Connect)",
+        "how": "Sunucuda OIDC_ISSUER, OIDC_CLIENT_ID ve OIDC_CLIENT_SECRET değerlerini ayarlayın."
+      },
+      "scim": {
+        "name": "İK senkronizasyonu (SCIM 2.0): /api/scim/v2",
+        "how": "Sunucuda SCIM_TOKEN ayarlayın ve aynı belirteci İK sistemine veya kimlik sağlayıcısına verin."
+      },
+      "scorm": {
+        "name": "Ayrı alan adında SCORM",
+        "how": "Dış tedarikçilerden paket kabul etmeden önce SCORM_CONTENT_ORIGIN ve SCORM_TOKEN_SECRET ayarlayın."
+      }
+    },
+    "on": "Açık",
+    "off": "Kapalı",
+    "keysTitle": "API anahtarları",
+    "keysIntro": "/api/v1/users, /api/v1/completions ve /api/v1/certificates için salt okunur erişim. Anahtarı Bearer belirteci olarak gönderin.",
+    "keyName": "Ad",
+    "keyNameHint": "Hangi sistem kullanacak, ör. Bordro",
+    "createKey": "Anahtar oluştur",
+    "keyCreated": "Anahtar oluşturuldu.",
+    "keyRevoked": "Anahtar iptal edildi.",
+    "copyNow": "Bunu şimdi kopyalayın. Tekrar gösterilmeyecek.",
+    "revoke": "İptal et",
+    "revoked": "İptal edildi",
+    "revokedOn": "İptal: {date}",
+    "lastUsed": "Son kullanım: {date}",
+    "neverUsed": "Henüz kullanılmadı",
+    "webhooksTitle": "Webhook'lar",
+    "webhooksIntro": "Akademi bir şey olduğunda bu adreslere gönderir. Her gönderim webhook'un gizli anahtarıyla imzalanır ve başarısız olursa yeniden denenir.",
+    "webhookUrl": "Adres",
+    "webhookUrlHint": "https:// ile başlamalıdır",
+    "events": "Şu durumda gönder",
+    "event": {
+      "course_completed": "Bir kurs tamamlandığında",
+      "certificate_issued": "Bir sertifika verildiğinde"
+    },
+    "addWebhook": "Webhook ekle",
+    "webhookCreated": "Webhook eklendi. İmzaları doğrulamak için aşağıdaki gizli anahtarı kullanın.",
+    "badUrl": "Tam bir https:// adresi girin.",
+    "noEvents": "En az bir olay seçin.",
+    "confirmRemove": "{host} webhook'u kaldırılsın mı? Gönderim geçmişi de silinir.",
+    "delivery": {
+      "PENDING": "Yeniden deneniyor",
+      "DELIVERED": "Teslim edildi",
+      "FAILED": "Başarısız"
+    }
+  },
   "assessment": {
     "title": "AI Seviye Belirleme Değerlendirmesi",
     "questionOf": "Soru {current} / {total}",
@@ -238,6 +291,7 @@
     "registerLink": "Hesabınızı oluşturun",
     "registerRefused": "Bu bilgilerle hesap oluşturulamadı. Çalışan numaranızı ve iş e-postanızı kontrol edin — daha önce giriş yaptıysanız bunun yerine Giriş yap'ı kullanın. Sorun sürerse İnsan Kaynakları'na başvurun.",
     "registerSubtitle": "İnsan Kaynakları tarafından daha önce eklenmiş çalışanlar içindir. Çalışan numaranızı ve iş e-postanızı girin, sonra bir parola seçin.",
+    "registerUseSso": "Şirketiniz tek oturum açma kullanıyor. Bunun yerine giriş sayfasındaki giriş düğmesini kullanın.",
     "resetInvalid": "Bu bağlantı artık geçerli değil. Yeni bir tane isteyin.",
     "resetSent": "Hesap mevcutsa sıfırlama bağlantısı gönderildi.",
     "resetSuccess": "Şifreniz güncellendi. Şimdi giriş yapabilirsiniz.",
@@ -245,6 +299,11 @@
     "signIn": "Giriş yap",
     "signInSubtitle": "Pratik yapay zekâ becerilerine giden kişisel yolculuğunuz.",
     "signingIn": "Giriş yapılıyor…",
+    "ssoButton": "{provider} ile giriş yap",
+    "ssoDefault": "şirket hesabınız",
+    "ssoFailed": "Tek oturum açma tamamlanmadı. Tekrar deneyin veya şifrenizle giriş yapın.",
+    "ssoOr": "veya personel kodunuz ve şifrenizle giriş yapın",
+    "ssoUnknown": "Şirket hesabınız etkin bir akademi hesabına bağlı değil. Lütfen İK ile iletişime geçin.",
     "tooManyAttempts": "Çok fazla deneme. Lütfen birkaç dakika bekleyip tekrar deneyin.",
     "welcomeBack": "Tekrar hoş geldiniz",
     "workEmail": "İş e-postası",
