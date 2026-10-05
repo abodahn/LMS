@@ -67,6 +67,7 @@ export default async function EditUserPage({ params }: PageProps<"/admin/people/
           preferredLanguage: user.preferredLanguage,
           status: user.status,
           roles: user.roles.map((r) => r.role.key),
+          certificateName: user.certificateName,
         }}
         {...options}
         canManage={admin.permissions.includes("users.manage")}

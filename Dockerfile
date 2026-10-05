@@ -49,6 +49,8 @@ COPY --from=build /app/tsconfig.json ./tsconfig.json
 # with only the 55 courses the seeds build in code, and the import fails
 # silently because the file it wants is not there.
 COPY --from=build /app/data ./data
+# Unicode fonts for certificates (Latin, Turkish and Arabic); OFL licences beside them.
+COPY --from=build /app/assets ./assets
 
 RUN mkdir -p /data/storage && chown -R node:node /data /app
 USER node

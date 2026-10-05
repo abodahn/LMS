@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { hashPassword, requirePermission } from "@/lib/auth";
+import { cleanCertificateName } from "@/lib/certificate-settings";
 import { audit } from "@/lib/audit";
 import { ROLE_KEYS, LOCALES } from "@/lib/constants";
 import { commitEmployeeImport, previewEmployeeImport, validateEmployeeRows, type ImportPreview } from "@/lib/import/employees";
@@ -30,6 +31,8 @@ const userSchema = z.object({
   managerId: z.string().optional(),
   preferredLanguage: z.enum(LOCALES),
   status: z.enum(["ACTIVE", "INACTIVE", "INVITED"]),
+  certificateName: z.string().optional(),
+  certificateNameWas: z.string().optional(),
 });
 
 /**
@@ -78,8 +81,25 @@ export async function saveUserAction(_prev: PeopleState, formData: FormData): Pr
 
   const before = d.userId ? await prisma.user.findUnique({ where: { id: d.userId } }) : null;
 
+  // HR's correction of the printed name stands as confirmed; clearing it asks
+  // the person to confirm their name again before their next download.
+  // Only when the field was changed in this form: a blank posted by a page
+  // opened before the person confirmed must not wipe their confirmation.
+  let certificateFields = {};
+  if (before && d.certificateName !== undefined && d.certificateName.trim() !== (d.certificateNameWas ?? "").trim()) {
+    const raw = d.certificateName.trim();
+    if (!raw) certificateFields = { certificateName: null, certificateNameConfirmedAt: null };
+    else {
+      const clean = cleanCertificateName(raw);
+      if (!clean) return { error: "certificates.nameInvalid" };
+      if (clean !== before.certificateName) {
+        certificateFields = { certificateName: clean, certificateNameConfirmedAt: before.certificateNameConfirmedAt ?? new Date() };
+      }
+    }
+  }
+
   const user = d.userId
-    ? await prisma.user.update({ where: { id: d.userId }, data })
+    ? await prisma.user.update({ where: { id: d.userId }, data: { ...data, ...certificateFields } })
     : await prisma.user.create({
         data: { ...data, passwordHash: await hashPassword(randomPassword()), mustChangePassword: true },
       });
@@ -95,7 +115,7 @@ export async function saveUserAction(_prev: PeopleState, formData: FormData): Pr
     entity: "User",
     entityId: user.id,
     before: before ?? undefined,
-    after: { ...data, roles },
+    after: { ...data, ...certificateFields, roles },
   });
 
   revalidatePath("/admin/people");

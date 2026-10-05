@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { rateLimit } from "@/lib/rate-limit";
 import { CircleCheck, CircleX, Clock } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { branding } from "@/lib/branding";
@@ -14,12 +16,28 @@ export const metadata: Metadata = { title: "Certificate verification" };
 /**
  * Public verification page. It deliberately shows only what is needed to
  * confirm a certificate is genuine — never department, score breakdown,
- * email or any other employee information.
+ * email or any other employee information. Lookups are limited per address,
+ * because certificate numbers run in sequence and every completed course now
+ * has one: unlimited, the page would let anyone list the whole company's
+ * training record by counting.
  */
 export default async function VerifyPage({ params }: PageProps<"/verify/[code]">) {
   const { code } = await params;
   const { dict, locale } = await getI18n();
   const t = (k: string, p?: Record<string, string | number>) => translate(dict, k, p);
+
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? "unknown";
+  if (!rateLimit(`verify:${ip}`, 20, 60_000)) {
+    return (
+      <div className="min-h-dvh bg-[var(--brand-canvas)]">
+        <main className="mx-auto max-w-lg px-5 py-12">
+          <h1 className="text-xl font-semibold tracking-tight text-[var(--brand-ink)]">{t("certificates.verifyTitle")}</h1>
+          <p className="mt-5 text-sm text-[var(--brand-muted)]">{t("certificates.tooManyLookups")}</p>
+        </main>
+      </div>
+    );
+  }
 
   const certificate = await prisma.certificate.findUnique({
     where: { code: code.toUpperCase() },
@@ -30,7 +48,7 @@ export default async function VerifyPage({ params }: PageProps<"/verify/[code]">
       expiresAt: true,
       status: true,
       learningHours: true,
-      user: { select: { fullName: true } },
+      user: { select: { fullName: true, certificateName: true } },
       level: { select: { code: true, name: true } },
     },
   });
@@ -73,7 +91,10 @@ export default async function VerifyPage({ params }: PageProps<"/verify/[code]">
 
         {certificate ? (
           <dl className="card mt-5 divide-y divide-[var(--brand-line)] px-5">
-            <Row label={t("certificates.issuedTo")} value={certificate.user.fullName} />
+            {/* A revoked certificate is reported as revoked, without naming its holder. */}
+            {state !== "REVOKED" ? (
+              <Row label={t("certificates.issuedTo")} value={certificate.user.certificateName ?? certificate.user.fullName} />
+            ) : null}
             <Row label={t("certificates.program")} value={certificate.title} />
             {certificate.level ? (
               <Row label={t("common.level")} value={`${certificate.level.code} — ${localized(certificate.level, "name", locale)}`} />

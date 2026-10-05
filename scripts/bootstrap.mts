@@ -90,6 +90,12 @@ async function ensureVocabulary() {
   const mapped = await mapCourseSkills(prisma);
   console.log(`[bootstrap] ${mapped.links} course-skill links`);
 
+  // Every completed course earns a certificate now; give the ones finished
+  // before that their own, once.
+  const { backfillCourseCertificates } = await import("../prisma/seed/certificates");
+  const backfill = await backfillCourseCertificates(prisma);
+  if (backfill.issued) console.log(`[bootstrap] ${backfill.issued} certificate(s) issued for earlier completions`);
+
   await ensurePermissions();
 }
 

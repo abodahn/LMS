@@ -10,7 +10,8 @@ import type { Db } from "./client";
  * (Chief Executive Officer, Accountant, Finance Manager, IT Manager, HR
  * Manager, Procurement Officer) are reused rather than duplicated.
  */
-export const GROUP_LOCATION = { name: "T-CAP Head Office", country: "Egypt" };
+/** Its people receive T-CAP certificates: a location's company decides the issuer. */
+export const GROUP_LOCATION = { name: "T-CAP Head Office", country: "Egypt", company: "TCAP" };
 
 const TITLES: { name: string; department: string; jobFamily: string; isManagerial: boolean }[] = [
   { name: "Chairman", department: "MGT", jobFamily: "MANAGEMENT", isManagerial: true },

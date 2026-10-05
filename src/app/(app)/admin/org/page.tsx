@@ -62,7 +62,9 @@ export default async function OrgPage() {
         }))}
       />
 
-      <LocationManager locations={locations.map((l) => ({ id: l.id, name: l.name, country: l.country, employees: l._count.users }))} />
+      <LocationManager
+        locations={locations.map((l) => ({ id: l.id, name: l.name, country: l.country, company: l.company, employees: l._count.users }))}
+      />
 
       <Card className="p-5">
         <h2 className="text-base font-semibold text-[var(--brand-ink)]">{t("form.jobFamilies")}</h2>

@@ -140,14 +140,20 @@ export async function reviewProofAction(_prev: EnrollmentState, formData: FormDa
   if (!parsed.success) return { error: "errors.validation" };
   const d = parsed.data;
 
-  const proof = await prisma.externalCompletionProof.update({
-    where: { id: d.proofId },
+  // Decided once: a second reviewer on a stale page must not reverse a
+  // verification after its certificate was issued, or issue a second one.
+  const claimed = await prisma.externalCompletionProof.updateMany({
+    where: { id: d.proofId, status: "PENDING" },
     data: {
       status: d.decision,
       reviewedById: admin.id,
       reviewedAt: new Date(),
       reviewNote: d.note || null,
     },
+  });
+  if (claimed.count === 0) return { error: "enrollments.proofAlreadyReviewed" };
+  const proof = await prisma.externalCompletionProof.findUniqueOrThrow({
+    where: { id: d.proofId },
     include: { enrollment: { include: { course: true, signOff: true } } },
   });
 

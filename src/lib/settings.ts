@@ -18,6 +18,16 @@ const DEFAULTS: Record<string, unknown> = {
   [SETTING_KEYS.AI_PROVIDER]: "anthropic",
   [SETTING_KEYS.AI_MODEL]: "claude-sonnet-5",
   [SETTING_KEYS.DEFAULT_LOCALE]: "en",
+  [SETTING_KEYS.CERT_ISSUER_TC]: "T&C Garments",
+  [SETTING_KEYS.CERT_ISSUER_TCAP]: "T-CAP",
+  [SETTING_KEYS.CERT_SIGN1_NAME]: "Ahmed Tolba",
+  [SETTING_KEYS.CERT_SIGN1_TITLE]: "Chief Executive Officer",
+  [SETTING_KEYS.CERT_SIGN2_NAME]: "Enis Dancir",
+  [SETTING_KEYS.CERT_SIGN2_TITLE]: "",
+  [SETTING_KEYS.CERT_TCAP_SIGN1_NAME]: "Ahmed Tolba",
+  [SETTING_KEYS.CERT_TCAP_SIGN1_TITLE]: "Chief Executive Officer",
+  [SETTING_KEYS.CERT_TCAP_SIGN2_NAME]: "",
+  [SETTING_KEYS.CERT_TCAP_SIGN2_TITLE]: "",
 };
 
 function parse(row: { value: string; type: string }): unknown {

@@ -268,7 +268,10 @@ export async function recalcEnrollmentProgress(enrollmentId: string) {
     where: { id: enrollmentId },
     data: {
       progressPercent: percent,
-      status: complete ? "COMPLETED" : percent > 0 ? "IN_PROGRESS" : enrollment.status,
+      // With no required lessons there is nothing here to decide: such a course
+      // is completed by attendance, a verified proof or a sign-off, and
+      // recalculating must not undo that.
+      status: lessons.length === 0 ? enrollment.status : complete ? "COMPLETED" : percent > 0 ? "IN_PROGRESS" : enrollment.status,
       startedAt: enrollment.startedAt ?? (percent > 0 ? new Date() : null),
       completedAt: complete ? (enrollment.completedAt ?? new Date()) : enrollment.completedAt,
       lastAccessedAt: new Date(),

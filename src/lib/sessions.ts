@@ -1,5 +1,7 @@
 import { prisma } from "./db";
 import { courseCompleted } from "./webhooks";
+import { issueCourseCertificate } from "./certificates";
+import { awardBadges } from "./badges";
 import { notify } from "./notifications";
 import { recalcEnrollmentProgress } from "./learner";
 import { creditHours } from "./session-hours";
@@ -201,7 +203,13 @@ export async function markAttendance(sessionId: string, marks: AttendanceMark[],
       },
     });
     await recalcEnrollmentProgress(enrollment.id);
-    if (enrollment.status !== "COMPLETED") await courseCompleted(enrollment.id);
+    if (enrollment.status !== "COMPLETED") {
+      await courseCompleted(enrollment.id);
+      // Attendance completes the course like any other route, so it earns the
+      // same certificate and badges.
+      await issueCourseCertificate(mark.userId, enrollment.id);
+      await awardBadges(mark.userId);
+    }
     completed++;
 
     await notify(mark.userId, {

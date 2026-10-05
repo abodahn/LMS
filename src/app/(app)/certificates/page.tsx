@@ -11,6 +11,7 @@ import { Card, EmptyState, Progress, SectionHeading, StatusPill } from "@/compon
 import { LinkButton } from "@/components/ui/button";
 import { DownloadLink } from "@/components/download-link";
 import { localized } from "@/lib/i18n";
+import { ConfirmName } from "./confirm-name";
 
 export const metadata: Metadata = { title: "Certificates" };
 
@@ -19,18 +20,36 @@ export default async function CertificatesPage() {
   const { dict, locale } = await getI18n();
   const t = (k: string, p?: Record<string, string | number>) => translate(dict, k, p);
 
-  const [certificates, eligibility] = await Promise.all([
+  const [certificates, eligibility, me] = await Promise.all([
     prisma.certificate.findMany({
       where: { userId: user.id },
       orderBy: { issuedAt: "desc" },
       include: { course: true, level: true },
     }),
     programEligibility(user.id),
+    prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: { fullName: true, certificateName: true, certificateNameConfirmedAt: true },
+    }),
   ]);
+  const confirmed = !!me.certificateNameConfirmedAt;
 
   return (
     <div className="space-y-6">
       <SectionHeading title={t("certificates.title")} />
+
+      {/* The name is confirmed once, before the first download, and then locked. */}
+      {!confirmed ? (
+        <Card className="border-[var(--brand-red)] p-5" id="confirm-name">
+          <h2 className="text-base font-semibold text-[var(--brand-ink)]">{t("certificates.nameTitle")}</h2>
+          <p className="mt-1 text-[13px] text-[var(--brand-muted)]">{t("certificates.nameIntro")}</p>
+          <ConfirmName suggested={me.certificateName ?? me.fullName} />
+        </Card>
+      ) : (
+        <p className="text-[13px] text-[var(--brand-muted)]">
+          {t("certificates.nameOnCertificates", { name: me.certificateName ?? me.fullName })}
+        </p>
+      )}
 
       {/* Progress towards the programme certificate — always explained. */}
       {!certificates.some((c) => c.type === "PROGRAM") ? (
@@ -107,10 +126,20 @@ export default async function CertificatesPage() {
                 </dl>
 
                 <div className="mt-auto flex flex-wrap gap-2 pt-4">
-                  <DownloadLink href={`/api/certificates/${c.id}/pdf`} variant="primary">
-                    <Download size={14} aria-hidden />
-                    {t("certificates.downloadPdf")}
-                  </DownloadLink>
+                  {confirmed ? (
+                    <DownloadLink href={`/api/certificates/${c.id}/pdf`} variant="primary">
+                      <Download size={14} aria-hidden />
+                      {t("certificates.downloadPdf")}
+                    </DownloadLink>
+                  ) : (
+                    <a
+                      href="#confirm-name"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-[var(--brand-canvas)] px-3 text-[13px] font-semibold text-[var(--brand-muted)]"
+                    >
+                      <Download size={14} aria-hidden />
+                      {t("certificates.confirmFirst")}
+                    </a>
+                  )}
                   <Link
                     href={`/verify/${c.code}`}
                     className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--brand-line)] px-3 text-[13px] font-semibold text-[var(--brand-ink)] hover:bg-[var(--brand-canvas)]"

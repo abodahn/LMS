@@ -15,6 +15,7 @@ import { SettingsForm } from "./settings-form";
 import { IntegrationsForm } from "./integrations-form";
 import { RemindersPanel } from "./reminders-panel";
 import { JobsPanel } from "./jobs-panel";
+import { CertificateForm } from "./certificate-form";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -62,6 +63,21 @@ export default async function SettingsPage() {
           lockoutMinutes: Number(settings[SETTING_KEYS.LOCKOUT_MINUTES]),
           defaultLocale: String(settings[SETTING_KEYS.DEFAULT_LOCALE]),
           readiness,
+        }}
+      />
+
+      <CertificateForm
+        values={{
+          issuerTc: String(settings[SETTING_KEYS.CERT_ISSUER_TC] ?? ""),
+          issuerTcap: String(settings[SETTING_KEYS.CERT_ISSUER_TCAP] ?? ""),
+          sign1Name: String(settings[SETTING_KEYS.CERT_SIGN1_NAME] ?? ""),
+          sign1Title: String(settings[SETTING_KEYS.CERT_SIGN1_TITLE] ?? ""),
+          sign2Name: String(settings[SETTING_KEYS.CERT_SIGN2_NAME] ?? ""),
+          sign2Title: String(settings[SETTING_KEYS.CERT_SIGN2_TITLE] ?? ""),
+          tcapSign1Name: String(settings[SETTING_KEYS.CERT_TCAP_SIGN1_NAME] ?? ""),
+          tcapSign1Title: String(settings[SETTING_KEYS.CERT_TCAP_SIGN1_TITLE] ?? ""),
+          tcapSign2Name: String(settings[SETTING_KEYS.CERT_TCAP_SIGN2_NAME] ?? ""),
+          tcapSign2Title: String(settings[SETTING_KEYS.CERT_TCAP_SIGN2_TITLE] ?? ""),
         }}
       />
 

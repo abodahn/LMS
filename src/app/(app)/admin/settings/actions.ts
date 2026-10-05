@@ -200,3 +200,47 @@ export async function runJobsAction(): Promise<string> {
 
   return outcomes.map((o) => `${o.key} — ${o.detail}`).join(" · ");
 }
+
+const certificateSchema = z.object({
+  issuerTc: z.string().trim().min(2).max(80),
+  issuerTcap: z.string().trim().min(2).max(80),
+  sign1Name: z.string().trim().min(2).max(80),
+  sign1Title: z.string().trim().max(80).default(""),
+  sign2Name: z.string().trim().max(80).default(""),
+  sign2Title: z.string().trim().max(80).default(""),
+  tcapSign1Name: z.string().trim().min(2).max(80),
+  tcapSign1Title: z.string().trim().max(80).default(""),
+  tcapSign2Name: z.string().trim().max(80).default(""),
+  tcapSign2Title: z.string().trim().max(80).default(""),
+});
+
+/** Issuer names, and each company's signatories, printed on every certificate. */
+export async function saveCertificateSettingsAction(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const admin = await requirePermission("settings.manage");
+  const parsed = certificateSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "errors.validation" };
+  const d = parsed.data;
+  const before = await getSettings();
+
+  await setSetting(SETTING_KEYS.CERT_ISSUER_TC, d.issuerTc);
+  await setSetting(SETTING_KEYS.CERT_ISSUER_TCAP, d.issuerTcap);
+  await setSetting(SETTING_KEYS.CERT_SIGN1_NAME, d.sign1Name);
+  await setSetting(SETTING_KEYS.CERT_SIGN1_TITLE, d.sign1Title);
+  await setSetting(SETTING_KEYS.CERT_SIGN2_NAME, d.sign2Name);
+  await setSetting(SETTING_KEYS.CERT_SIGN2_TITLE, d.sign2Title);
+  await setSetting(SETTING_KEYS.CERT_TCAP_SIGN1_NAME, d.tcapSign1Name);
+  await setSetting(SETTING_KEYS.CERT_TCAP_SIGN1_TITLE, d.tcapSign1Title);
+  await setSetting(SETTING_KEYS.CERT_TCAP_SIGN2_NAME, d.tcapSign2Name);
+  await setSetting(SETTING_KEYS.CERT_TCAP_SIGN2_TITLE, d.tcapSign2Title);
+
+  await audit({
+    actorId: admin.id,
+    actorName: admin.fullName,
+    action: "CERTIFICATE_SETTINGS_CHANGE",
+    entity: "SystemSetting",
+    before: Object.fromEntries(Object.entries(before).filter(([k]) => k.startsWith("certificates."))),
+    after: d,
+  });
+  revalidatePath("/admin/settings");
+  return { success: "common.saved" };
+}

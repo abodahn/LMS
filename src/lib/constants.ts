@@ -135,6 +135,16 @@ export const SETTING_KEYS = {
   ORG_NAME: "branding.orgName",
   PLATFORM_NAME: "branding.platformName",
   DEFAULT_LOCALE: "general.defaultLocale",
+  CERT_ISSUER_TC: "certificates.issuerTcName",
+  CERT_ISSUER_TCAP: "certificates.issuerTcapName",
+  CERT_SIGN1_NAME: "certificates.signatory1Name",
+  CERT_SIGN1_TITLE: "certificates.signatory1Title",
+  CERT_SIGN2_NAME: "certificates.signatory2Name",
+  CERT_SIGN2_TITLE: "certificates.signatory2Title",
+  CERT_TCAP_SIGN1_NAME: "certificates.tcapSignatory1Name",
+  CERT_TCAP_SIGN1_TITLE: "certificates.tcapSignatory1Title",
+  CERT_TCAP_SIGN2_NAME: "certificates.tcapSignatory2Name",
+  CERT_TCAP_SIGN2_TITLE: "certificates.tcapSignatory2Title",
 } as const;
 
 export const READINESS_DEFAULT_WEIGHTS = {

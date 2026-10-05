@@ -147,6 +147,7 @@ export async function saveJobTitleAction(_prev: OrgState, formData: FormData): P
 const locationSchema = z.object({
   name: z.string().trim().min(2).max(120),
   country: z.string().trim().max(80).optional(),
+  company: z.enum(["TC", "TCAP"]).default("TC"),
 });
 
 export async function addLocationAction(_prev: OrgState, formData: FormData): Promise<OrgState> {
@@ -157,13 +158,40 @@ export async function addLocationAction(_prev: OrgState, formData: FormData): Pr
   const existing = await prisma.location.findUnique({ where: { name: parsed.data.name } });
   if (existing) return { error: "errors.validation" };
 
-  await prisma.location.create({ data: { name: parsed.data.name, country: parsed.data.country || null } });
+  await prisma.location.create({
+    data: { name: parsed.data.name, country: parsed.data.country || null, company: parsed.data.company },
+  });
   await audit({
     actorId: admin.id,
     actorName: admin.fullName,
     action: "LOCATION_CREATE",
     entity: "Location",
     summary: parsed.data.name,
+  });
+  revalidatePath("/admin/org");
+  return { success: "common.saved" };
+}
+
+/**
+ * Which company a location belongs to. People there receive that company's
+ * certificates from now on; certificates already issued keep their issuer.
+ */
+export async function setLocationCompanyAction(_prev: OrgState, formData: FormData): Promise<OrgState> {
+  const admin = await requirePermission("org.manage");
+  const parsed = z.object({ id: z.string().min(1), company: z.enum(["TC", "TCAP"]) }).safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "errors.validation" };
+  const before = await prisma.location.findUnique({ where: { id: parsed.data.id } });
+  if (!before) return { error: "errors.validation" };
+  if (before.company === parsed.data.company) return { success: "common.saved" };
+
+  await prisma.location.update({ where: { id: before.id }, data: { company: parsed.data.company } });
+  await audit({
+    actorId: admin.id,
+    actorName: admin.fullName,
+    action: "LOCATION_COMPANY_SET",
+    entity: "Location",
+    entityId: before.id,
+    summary: `${before.name}: ${before.company} → ${parsed.data.company}`,
   });
   revalidatePath("/admin/org");
   return { success: "common.saved" };

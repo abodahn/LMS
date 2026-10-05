@@ -1,12 +1,14 @@
 import "server-only";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import QRCode from "qrcode";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./db";
 import { getCertificationPolicy } from "./settings";
 import { branding } from "./branding";
 import { audit } from "./audit";
 import { notify } from "./notifications";
 import { emit } from "./webhooks";
+import { drawCertificate } from "./certificate-pdf";
+import { certificateSettings, issuerKey, nextCertificateCode as nextCode } from "./certificate-settings";
+import { hasCertificateEvidence } from "./certificate-code";
 
 /** TCAI-2026-000001 — sequential within the year, unique across the system. */
 async function emitCertificate(id: string) {
@@ -27,27 +29,40 @@ async function emitCertificate(id: string) {
   });
 }
 
-export async function nextCertificateCode() {
-  const year = new Date().getFullYear();
-  const prefix = `TCAI-${year}-`;
-  const last = await prisma.certificate.findFirst({
-    where: { code: { startsWith: prefix } },
-    orderBy: { code: "desc" },
-    select: { code: true },
-  });
-  const n = last ? Number(last.code.slice(prefix.length)) + 1 : 1;
-  return `${prefix}${String(n).padStart(6, "0")}`;
+export function nextCertificateCode() {
+  return nextCode(prisma);
 }
 
-/** Issued when an internal course is finished, or an external one is verified. */
+/**
+ * Creates a certificate with the next free number. Two completions at the same
+ * moment can read the same last number; the second insert then hits the
+ * unique code, so it takes the following number and tries again.
+ */
+async function createNumbered(data: Omit<Prisma.CertificateUncheckedCreateInput, "code">) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await prisma.certificate.create({ data: { ...data, code: await nextCode(prisma) } });
+    } catch (error) {
+      const clash = (error as { code?: string }).code === "P2002";
+      if (!clash || attempt >= 4) throw error;
+    }
+  }
+}
+
+/**
+ * Issued for every completed course that has evidence behind it (see
+ * hasCertificateEvidence): internal courses, and outside courses once a proof
+ * is verified, attendance is taken or a supervisor signs off. Issued by the
+ * company the person works for — their location's company, T&C or T-CAP.
+ */
 export async function issueCourseCertificate(userId: string, enrollmentId: string) {
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: enrollmentId },
-    include: { course: true },
+    include: { course: true, user: { select: { location: { select: { company: true } } } } },
   });
   if (!enrollment || enrollment.userId !== userId) return null;
   if (enrollment.status !== "COMPLETED") return null;
-  if (!enrollment.course.isInternal) return null;
+  if (!(await hasCertificateEvidence(prisma, enrollment))) return null;
 
   // Reused only when it already covers this completion. Recurring training
   // completes the same course again a year later, and handing back last year's
@@ -60,15 +75,13 @@ export async function issueCourseCertificate(userId: string, enrollmentId: strin
   });
   if (existing && (!enrollment.completedAt || existing.issuedAt >= enrollment.completedAt)) return existing;
 
-  const certificate = await prisma.certificate.create({
-    data: {
-      code: await nextCertificateCode(),
+  const certificate = await createNumbered({
       userId,
       type: "COURSE",
       title: enrollment.course.title,
       courseId: enrollment.courseId,
       learningHours: enrollment.course.estimatedHours,
-    },
+      issuer: issuerKey(enrollment.user.location?.company),
   });
 
   await notify(userId, {
@@ -155,10 +168,9 @@ export async function issueProgramCertificate(userId: string) {
     where: { userId, status: "COMPLETED" },
     include: { course: true },
   });
+  const holder = await prisma.user.findUnique({ where: { id: userId }, select: { location: { select: { company: true } } } });
 
-  const certificate = await prisma.certificate.create({
-    data: {
-      code: await nextCertificateCode(),
+  const certificate = await createNumbered({
       userId,
       type: "PROGRAM",
       title: `${branding.platformName} — AI Capability Programme`,
@@ -166,7 +178,7 @@ export async function issueProgramCertificate(userId: string) {
       attemptId: attempt?.id ?? null,
       finalScore: eligibility.finalScore,
       learningHours: enrollments.reduce((s, e) => s + e.course.estimatedHours, 0),
-    },
+      issuer: issuerKey(holder?.location?.company),
   });
 
   await notify(userId, {
@@ -199,112 +211,28 @@ export async function revokeCertificate(certificateId: string, actorId: string, 
 // PDF
 // ---------------------------------------------------------------------------
 
-const hexToRgb = (hex: string) => {
-  const v = hex.replace("#", "");
-  return rgb(
-    parseInt(v.slice(0, 2), 16) / 255,
-    parseInt(v.slice(2, 4), 16) / 255,
-    parseInt(v.slice(4, 6), 16) / 255,
-  );
-};
-
 export async function renderCertificatePdf(certificateId: string): Promise<Uint8Array> {
   const certificate = await prisma.certificate.findUniqueOrThrow({
     where: { id: certificateId },
-    include: { user: true, course: true, path: true, level: true },
+    include: { user: true, course: { include: { provider: true } }, level: true },
   });
+  const settings = await certificateSettings();
+  const key = issuerKey(certificate.issuer);
+  const course = certificate.course;
 
-  const verifyUrl = `${process.env.APP_URL ?? "http://localhost:3000"}/verify/${certificate.code}`;
-  const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 0, width: 240 });
-  const qrBytes = Buffer.from(qrDataUrl.split(",")[1], "base64");
-
-  const pdf = await PDFDocument.create();
-  pdf.setTitle(`${certificate.title} — ${certificate.user.fullName}`);
-  pdf.setAuthor(branding.organizationName);
-  pdf.setSubject("Certificate of completion");
-
-  const page = pdf.addPage([842, 595]); // A4 landscape
-  const { width, height } = page.getSize();
-
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const regular = await pdf.embedFont(StandardFonts.Helvetica);
-  const ink = hexToRgb(branding.colors.ink);
-  const red = hexToRgb(branding.colors.red);
-  const muted = hexToRgb(branding.colors.muted);
-  const line = hexToRgb(branding.colors.line);
-
-  // Frame
-  page.drawRectangle({ x: 0, y: height - 10, width, height: 10, color: red });
-  page.drawRectangle({
-    x: 28,
-    y: 28,
-    width: width - 56,
-    height: height - 66,
-    borderColor: line,
-    borderWidth: 1,
+  return drawCertificate({
+    issuer: { key, name: settings.issuers[key] },
+    recipient: certificate.user.certificateName ?? certificate.user.fullName,
+    kind: certificate.type,
+    title: certificate.title,
+    // An outside course says whose it was: T&C certifies the completion, not the authorship.
+    provider: course && !course.isInternal ? (course.provider?.name ?? course.platform ?? null) : null,
+    issuedAt: certificate.issuedAt,
+    hours: certificate.learningHours,
+    level: certificate.level ? `${certificate.level.code} — ${certificate.level.name}` : null,
+    finalScore: certificate.finalScore,
+    code: certificate.code,
+    verifyUrl: `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "")}/verify/${certificate.code}`,
+    signatories: settings.signatories[key],
   });
-
-  const centre = (text: string, y: number, size: number, font = regular, color = ink) => {
-    const w = font.widthOfTextAtSize(text, size);
-    page.drawText(text, { x: (width - w) / 2, y, size, font, color });
-  };
-
-  centre(branding.organizationName.toUpperCase(), height - 78, 11, bold, red);
-  centre(branding.platformName, height - 106, 22, bold, ink);
-  centre("CERTIFICATE OF COMPLETION", height - 140, 10, regular, muted);
-
-  centre(certificate.user.fullName, height - 196, 32, bold, ink);
-  centre("has successfully completed", height - 222, 11, regular, muted);
-
-  const title = certificate.title.length > 68 ? `${certificate.title.slice(0, 65)}…` : certificate.title;
-  centre(title, height - 258, 18, bold, ink);
-
-  if (certificate.level) {
-    centre(`AI Level achieved: ${certificate.level.code} — ${certificate.level.name}`, height - 284, 11, regular, muted);
-  }
-
-  // Detail row
-  const details: [string, string][] = [
-    ["Completion date", certificate.issuedAt.toISOString().slice(0, 10)],
-    ["Learning hours", `${certificate.learningHours}`],
-    ["Certificate ID", certificate.code],
-  ];
-  if (certificate.finalScore != null) {
-    details.splice(2, 0, ["Final assessment", `${Math.round(certificate.finalScore)}%`]);
-  }
-
-  const colWidth = (width - 200) / details.length;
-  details.forEach(([label, value], i) => {
-    const x = 100 + i * colWidth;
-    page.drawText(label.toUpperCase(), { x, y: 190, size: 7.5, font: bold, color: muted });
-    page.drawText(value, { x, y: 172, size: 11, font: regular, color: ink });
-  });
-
-  page.drawLine({ start: { x: 100, y: 160 }, end: { x: width - 100, y: 160 }, color: line, thickness: 1 });
-
-  // Signature blocks
-  const sigY = 96;
-  const blocks = ["Head of Learning & Development", "Human Resources"];
-  blocks.forEach((label, i) => {
-    const x = 100 + i * 260;
-    page.drawLine({ start: { x, y: sigY + 22 }, end: { x: x + 190, y: sigY + 22 }, color: line, thickness: 1 });
-    page.drawText(label, { x, y: sigY + 6, size: 8, font: regular, color: muted });
-  });
-
-  // QR + verification
-  const qrImage = await pdf.embedPng(qrBytes);
-  const qrSize = 92;
-  page.drawImage(qrImage, { x: width - 100 - qrSize, y: sigY - 8, width: qrSize, height: qrSize });
-  page.drawText("Verify at", { x: width - 100 - qrSize, y: sigY - 24, size: 7.5, font: bold, color: muted });
-  page.drawText(verifyUrl.replace(/^https?:\/\//, ""), {
-    x: width - 100 - qrSize,
-    y: sigY - 36,
-    size: 7,
-    font: regular,
-    color: muted,
-  });
-
-  page.drawRectangle({ x: 0, y: 0, width, height: 6, color: ink });
-
-  return pdf.save();
 }

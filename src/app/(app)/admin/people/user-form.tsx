@@ -53,6 +53,7 @@ export function UserForm({
     preferredLanguage: string;
     status: string;
     roles: string[];
+    certificateName?: string | null;
   };
   departments: Option[];
   sections: (Option & { departmentId: string })[];
@@ -93,6 +94,16 @@ export function UserForm({
             <Field label={t("profile.email")} required>
               {(p) => <TextInput {...p} name="email" type="email" required defaultValue={user?.email ?? ""} />}
             </Field>
+            {user ? (
+              <Field label={t("certificates.nameAdminLabel")} hint={t("certificates.nameAdminHint")}>
+                {(p) => (
+                  <>
+                    <TextInput {...p} name="certificateName" maxLength={80} dir="auto" defaultValue={user.certificateName ?? ""} />
+                    <input type="hidden" name="certificateNameWas" value={user.certificateName ?? ""} />
+                  </>
+                )}
+              </Field>
+            ) : null}
             <Field label={t("profile.preferredLanguage")} required>
               {(p) => (
                 <Select {...p} name="preferredLanguage" defaultValue={user?.preferredLanguage ?? "en"}>

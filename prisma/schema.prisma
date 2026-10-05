@@ -35,6 +35,10 @@ model User {
   /// A | B | C for a rotating factory, or DAY | NIGHT. Free text because the
   /// naming differs per site and a wrong enum is worse than a string.
   shift              String?
+  /// How the name is printed on certificates, confirmed by the person before
+  /// their first download (or set by an administrator). Null until then.
+  certificateName            String?
+  certificateNameConfirmedAt DateTime?
   departmentId       String?
   sectionId          String?
   jobTitleId         String?
@@ -193,6 +197,9 @@ model Location {
   id       String            @id @default(cuid())
   name     String            @unique
   country  String?
+  /// The company people here belong to — TC or TCAP. Decides whose
+  /// certificates they receive.
+  company  String            @default("TC")
   users    User[]
   sessions TrainingSession[]
 }
@@ -1034,6 +1041,8 @@ model Certificate {
   revokedAt     DateTime?
   revokedById   String?
   revokeReason  String?
+  /// The issuing company when it was issued (TC | TCAP), kept even if the person moves later.
+  issuer        String    @default("TC")
 
   user      User               @relation("CertificateHolder", fields: [userId], references: [id], onDelete: Cascade)
   revokedBy User?              @relation("CertificateRevoker", fields: [revokedById], references: [id])
