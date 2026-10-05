@@ -70,6 +70,12 @@ async function ensureVocabulary() {
   const careers = await seedCareers(prisma);
   console.log(`[bootstrap] career ladders: ${careers.ladders} written, ${careers.existing} already present`);
 
+  // The Tolba Group (T-CAP) head office's job titles and location, created
+  // once if missing so its people can be imported with their real roles.
+  const { seedGroupTitles } = await import("../prisma/seed/group");
+  const group = await seedGroupTitles(prisma);
+  if (group.added) console.log(`[bootstrap] ${group.added} T-CAP job title(s)/location added`);
+
   // Skills and the levels each job expects of them. Upserts, and re-run every
   // boot for the same reason as the categories: a requirement added after the
   // first deploy has to reach a database that already exists.
