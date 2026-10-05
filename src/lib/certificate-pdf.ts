@@ -1,6 +1,6 @@
 import path from "node:path";
 import { readFileSync } from "node:fs";
-import { PDFDocument, rgb, degrees, type PDFFont, type PDFPage, type RGB } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, degrees, type PDFFont, type PDFPage, type RGB } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import QRCode from "qrcode";
 
@@ -260,10 +260,10 @@ export function wrap(text: string, width: (t: string) => number, maxWidth: numbe
 // --- ornaments -----------------------------------------------------------------
 
 /** Letter-spaced capitals, centred: pdf-lib has no tracking, so glyph by glyph. */
-function tracked(page: PDFPage, text: string, font: PDFFont, size: number, y: number, color: RGB, spacing: number) {
+function tracked(page: PDFPage, text: string, font: PDFFont, size: number, y: number, color: RGB, spacing: number, cx = W / 2) {
   const chars = [...text];
   const total = chars.reduce((s, ch) => s + font.widthOfTextAtSize(ch, size), 0) + spacing * (chars.length - 1);
-  let x = W / 2 - total / 2;
+  let x = cx - total / 2;
   for (const ch of chars) {
     page.drawText(ch, { x, y, size, font, color });
     x += font.widthOfTextAtSize(ch, size) + spacing;
@@ -310,78 +310,57 @@ function formatDate(d: Date) {
 
 // --- the page --------------------------------------------------------------------
 
-export async function drawCertificate(d: CertificateDesign): Promise<Uint8Array> {
-  const pdf = await PDFDocument.create();
-  pdf.registerFontkit(fontkit);
-  pdf.setTitle(`${d.title} — ${d.recipient}`);
-  pdf.setAuthor(d.issuer.name);
-  pdf.setSubject("Certificate of completion");
-  pdf.setCreator("T&C AI Academy");
+type Ink = { title: RGB; text: RGB; soft: RGB; line: RGB };
+type Ctx = { pdf: PDFDocument; page: PDFPage; ts: Typesetter; latin: Latin; d: CertificateDesign };
 
-  const f = fontFiles();
-  const latin: Latin = {
-    regular: await pdf.embedFont(f["NotoSerif-Regular"], { subset: true }),
-    bold: await pdf.embedFont(f["NotoSerif-Bold"], { subset: true }),
-    italic: await pdf.embedFont(f["NotoSerif-Italic"], { subset: true }),
+/** A pointy-top hexagon, like the T-GROUP mark, as an SVG path centred on the origin (y down). */
+function hexPath(r: number) {
+  return (
+    Array.from({ length: 6 }, (_, i) => {
+      const a = Math.PI / 2 + (i * Math.PI) / 3;
+      return `${i ? "L" : "M"}${(r * Math.cos(a)).toFixed(2)},${(-r * Math.sin(a)).toFixed(2)}`;
+    }).join(" ") + " Z"
+  );
+}
+
+/** A rectangle with its corners cut at 45°, drawn from page coordinates. */
+function chamfered(page: PDFPage, x0: number, y0: number, x1: number, y1: number, c: number, color: RGB, width: number) {
+  const pts = [
+    [x0 + c, y0], [x1 - c, y0], [x1, y0 + c], [x1, y1 - c],
+    [x1 - c, y1], [x0 + c, y1], [x0, y1 - c], [x0, y0 + c],
+  ];
+  const path = pts.map(([x, y], i) => `${i ? "L" : "M"}${x},${H - y}`).join(" ") + " Z";
+  page.drawSvgPath(path, { x: 0, y: H, borderColor: color, borderWidth: width });
+}
+
+/**
+ * Name, what was completed, and the facts: the same on every certificate, in
+ * the colours of the issuer. `top` is the baseline of "This is to certify that".
+ */
+function body({ page, ts, latin, d }: Ctx, ink: Ink, top: number, leadFont?: PDFFont) {
+  // The fixed English phrases may use a theme's own face; names and titles
+  // always use the Unicode fonts, since they can be in any language.
+  const lead = (text: string, y: number, size: number) => {
+    if (leadFont) {
+      const w = leadFont.widthOfTextAtSize(text, size);
+      page.drawText(text, { x: W / 2 - w / 2, y, size, font: leadFont, color: ink.soft });
+    } else ts.centred(text, "italic", size, y, ink.soft);
   };
-  const page = pdf.addPage([W, H]);
-  const ts = new Typesetter(page, latin);
-
-  // Paper, a double frame and red corners.
-  page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: C.paper });
-  page.drawRectangle({ x: 18, y: 18, width: W - 36, height: H - 36, borderColor: C.charcoal, borderWidth: 0.8 });
-  page.drawRectangle({ x: 26, y: 26, width: W - 52, height: H - 52, borderColor: C.red, borderWidth: 1.6 });
-  page.drawRectangle({ x: 31, y: 31, width: W - 62, height: H - 62, borderColor: C.line, borderWidth: 0.5 });
-  for (const [x, y, sx, sy] of [
-    [26, 26, 1, 1],
-    [W - 26, 26, -1, 1],
-    [26, H - 26, 1, -1],
-    [W - 26, H - 26, -1, -1],
-  ] as const) {
-    page.drawRectangle({ x: sx > 0 ? x : x - 34, y: sy > 0 ? y : y - 5, width: 34, height: 5, color: C.red });
-    page.drawRectangle({ x: sx > 0 ? x : x - 5, y: sy > 0 ? y : y - 34, width: 5, height: 34, color: C.red });
-  }
-
-  // Header: the issuer on the left, the number and QR code on the right.
-  const group = d.issuer.key === "TCAP" ? groupLogo() : null;
-  const groupMark = group ? await pdf.embedPng(group.mark) : null;
-  if (!group) {
-    tcMark(page, 56, H - 52, 40);
-    const caps = d.issuer.name.toUpperCase();
-    ts.draw(ts.clip(caps, "bold", 11, 250), "bold", 11, 90, H - 76, C.ink);
-    page.drawText("T&C AI ACADEMY", { x: 90, y: H - 90, size: 7.5, font: latin.regular, color: C.muted });
-  } else {
-    const logo = await pdf.embedPng(group.logo);
-    const h = 34;
-    page.drawImage(logo, { x: 56, y: H - 52 - h, width: (logo.width / logo.height) * h, height: h });
-    page.drawText("T&C AI ACADEMY", { x: 56, y: H - 100, size: 7.5, font: latin.regular, color: C.muted });
-  }
-  const label = "CERTIFICATE NO.";
-  page.drawText(label, { x: W - 56 - latin.regular.widthOfTextAtSize(label, 7), y: H - 70, size: 7, font: latin.regular, color: C.muted });
-  page.drawText(d.code, { x: W - 56 - latin.bold.widthOfTextAtSize(d.code, 10), y: H - 84, size: 10, font: latin.bold, color: C.ink });
-
-  // Title.
-  tracked(page, "CERTIFICATE", latin.bold, 38, H - 150, C.ink, 7);
-  tracked(page, d.kind === "PROGRAM" ? "OF ACHIEVEMENT" : "OF COMPLETION", latin.regular, 12, H - 173, C.red, 5);
-  page.drawLine({ start: { x: W / 2 - 110, y: H - 188 }, end: { x: W / 2 - 10, y: H - 188 }, thickness: 0.8, color: C.red });
-  page.drawLine({ start: { x: W / 2 + 10, y: H - 188 }, end: { x: W / 2 + 110, y: H - 188 }, thickness: 0.8, color: C.red });
-  page.drawSvgPath("M0,-4 L4,0 L0,4 L-4,0 Z", { x: W / 2, y: H - 188, color: C.red, borderWidth: 0 });
-
-  // Recipient.
-  ts.centred("This is to certify that", "italic", 12.5, H - 218, C.muted);
+  lead("This is to certify that", top, leadFont ? 11 : 12.5);
   const nameWeight: Weight = isRtl(d.recipient) ? "bold" : "italic";
   const nameSize = ts.fit(d.recipient, nameWeight, 36, 600, 12);
-  ts.centred(ts.clip(d.recipient, nameWeight, nameSize, 600), nameWeight, nameSize, H - 262, C.ink);
-  page.drawLine({ start: { x: W / 2 - 190, y: H - 275 }, end: { x: W / 2 + 190, y: H - 275 }, thickness: 0.6, color: C.line });
+  ts.centred(ts.clip(d.recipient, nameWeight, nameSize, 600), nameWeight, nameSize, top - 44, ink.title);
+  page.drawLine({ start: { x: W / 2 - 190, y: top - 57 }, end: { x: W / 2 + 190, y: top - 57 }, thickness: 0.6, color: ink.line });
 
-  // What was completed.
-  const lead =
+  lead(
     d.kind === "PROGRAM"
       ? "has met every requirement of the programme"
       : d.kind === "PATH"
         ? "has successfully completed the learning path"
-        : "has successfully completed the course";
-  ts.centred(lead, "italic", 12, H - 300, C.muted);
+        : "has successfully completed the course",
+    top - 82,
+    leadFont ? 11 : 12,
+  );
 
   let titleSize = 20;
   let lines = wrap(d.title, (t) => ts.width(t, "bold", titleSize), 620);
@@ -392,8 +371,8 @@ export async function drawCertificate(d: CertificateDesign): Promise<Uint8Array>
   if (lines.length > 2) lines = [lines[0], lines.slice(1).join(" ")];
   lines = lines.map((l) => ts.clip(l, "bold", titleSize, 620));
   const gap = titleSize * 1.4;
-  const titleTop = H - 332 + (lines.length === 1 ? -4 : 0);
-  lines.forEach((l, i) => ts.centred(l, "bold", titleSize, titleTop - i * gap, C.charcoal));
+  const titleTop = top - 114 + (lines.length === 1 ? -4 : 0);
+  lines.forEach((l, i) => ts.centred(l, "bold", titleSize, titleTop - i * gap, ink.text));
 
   // Facts, each part set on its own so a provider's Arabic name stays shaped.
   const parts = [
@@ -409,48 +388,209 @@ export async function drawCertificate(d: CertificateDesign): Promise<Uint8Array>
     const total = parts.reduce((s, p) => s + ts.width(p, "regular", 9.5), 0) + sepW * (parts.length - 1);
     let x = W / 2 - total / 2;
     parts.forEach((p, i) => {
-      x += ts.draw(p, "regular", 9.5, x, factsY, C.muted);
+      x += ts.draw(p, "regular", 9.5, x, factsY, ink.soft);
       if (i < parts.length - 1) {
-        page.drawText(sep, { x, y: factsY, size: 9.5, font: latin.regular, color: C.muted });
+        page.drawText(sep, { x, y: factsY, size: 9.5, font: latin.regular, color: ink.soft });
         x += sepW;
       }
     });
   }
-  ts.centred(`Awarded on ${formatDate(d.issuedAt)}`, "regular", 10.5, factsY - 18, C.charcoal);
+  ts.centred(`Awarded on ${formatDate(d.issuedAt)}`, "regular", 10.5, factsY - 18, ink.text);
+}
 
-  // Signatures either side of the seal.
+function signatures({ page, ts, d }: Ctx, ink: Ink, centres: number[], sigY: number) {
+  d.signatories
+    .filter((s) => s.name.trim())
+    .slice(0, centres.length)
+    .forEach((s, i) => {
+      const cx = centres[i];
+      page.drawLine({ start: { x: cx - 95, y: sigY + 26 }, end: { x: cx + 95, y: sigY + 26 }, thickness: 0.8, color: ink.text });
+      ts.centred(s.name, "bold", ts.fit(s.name, "bold", 11.5, 190), sigY + 10, ink.title, cx);
+      if (s.title.trim()) ts.centred(s.title, "regular", ts.fit(s.title, "regular", 9, 200, 7), sigY - 4, ink.soft, cx);
+    });
+}
+
+async function qrCode({ pdf, page }: Ctx, url: string, x: number, y: number, size: number) {
+  const png = Buffer.from((await QRCode.toDataURL(url, { margin: 0, width: 220 })).split(",")[1], "base64");
+  page.drawImage(await pdf.embedPng(png), { x, y, width: size, height: size });
+}
+
+/** T&C Garments: warm paper, red frame and corners, the T&C mark, a round seal. */
+async function drawTc(ctx: Ctx) {
+  const { page, ts, latin, d } = ctx;
+  const ink: Ink = { title: C.ink, text: C.charcoal, soft: C.muted, line: C.line };
+
+  page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: C.paper });
+  page.drawRectangle({ x: 18, y: 18, width: W - 36, height: H - 36, borderColor: C.charcoal, borderWidth: 0.8 });
+  page.drawRectangle({ x: 26, y: 26, width: W - 52, height: H - 52, borderColor: C.red, borderWidth: 1.6 });
+  page.drawRectangle({ x: 31, y: 31, width: W - 62, height: H - 62, borderColor: C.line, borderWidth: 0.5 });
+  for (const [x, y, sx, sy] of [
+    [26, 26, 1, 1],
+    [W - 26, 26, -1, 1],
+    [26, H - 26, 1, -1],
+    [W - 26, H - 26, -1, -1],
+  ] as const) {
+    page.drawRectangle({ x: sx > 0 ? x : x - 34, y: sy > 0 ? y : y - 5, width: 34, height: 5, color: C.red });
+    page.drawRectangle({ x: sx > 0 ? x : x - 5, y: sy > 0 ? y : y - 34, width: 5, height: 34, color: C.red });
+  }
+
+  tcMark(page, 56, H - 52, 40);
+  ts.draw(ts.clip(d.issuer.name.toUpperCase(), "bold", 11, 250), "bold", 11, 90, H - 76, C.ink);
+  page.drawText("T&C AI ACADEMY", { x: 90, y: H - 90, size: 7.5, font: latin.regular, color: C.muted });
+  const label = "CERTIFICATE NO.";
+  page.drawText(label, { x: W - 56 - latin.regular.widthOfTextAtSize(label, 7), y: H - 70, size: 7, font: latin.regular, color: C.muted });
+  page.drawText(d.code, { x: W - 56 - latin.bold.widthOfTextAtSize(d.code, 10), y: H - 84, size: 10, font: latin.bold, color: C.ink });
+  await qrCode(ctx, d.verifyUrl, W - 56 - 46, H - 146, 46);
+  const scan = "Scan to verify";
+  page.drawText(scan, { x: W - 56 - 23 - latin.regular.widthOfTextAtSize(scan, 6.5) / 2, y: H - 156, size: 6.5, font: latin.regular, color: C.muted });
+
+  tracked(page, "CERTIFICATE", latin.bold, 38, H - 150, C.ink, 7);
+  tracked(page, d.kind === "PROGRAM" ? "OF ACHIEVEMENT" : "OF COMPLETION", latin.regular, 12, H - 173, C.red, 5);
+  page.drawLine({ start: { x: W / 2 - 110, y: H - 188 }, end: { x: W / 2 - 10, y: H - 188 }, thickness: 0.8, color: C.red });
+  page.drawLine({ start: { x: W / 2 + 10, y: H - 188 }, end: { x: W / 2 + 110, y: H - 188 }, thickness: 0.8, color: C.red });
+  page.drawSvgPath("M0,-4 L4,0 L0,4 L-4,0 Z", { x: W / 2, y: H - 188, color: C.red, borderWidth: 0 });
+
+  body(ctx, ink, H - 218);
+
   const sigY = 84;
-  const blocks = d.signatories.filter((s) => s.name.trim()).slice(0, 2);
-  const centres = blocks.length === 1 ? [W / 2 - 230] : [W / 2 - 230, W / 2 + 230];
-  blocks.forEach((s, i) => {
-    const cx = centres[i];
-    page.drawLine({ start: { x: cx - 95, y: sigY + 26 }, end: { x: cx + 95, y: sigY + 26 }, thickness: 0.8, color: C.charcoal });
-    ts.centred(s.name, "bold", ts.fit(s.name, "bold", 11.5, 190), sigY + 10, C.ink, cx);
-    if (s.title.trim()) ts.centred(s.title, "regular", ts.fit(s.title, "regular", 9, 200, 7), sigY - 4, C.muted, cx);
-  });
+  const count = d.signatories.filter((s) => s.name.trim()).length;
+  signatures(ctx, ink, count === 1 ? [W / 2 - 230] : [W / 2 - 230, W / 2 + 230], sigY);
 
-  // Seal: two rings, the issuer around the top, its mark in the middle.
+  // Seal: two rings, the issuer around the top, the T&C mark in the middle.
   const sx = W / 2;
   const sy = sigY + 22;
-  const issuerCaps = d.issuer.name.toUpperCase();
+  const caps = d.issuer.name.toUpperCase();
   page.drawCircle({ x: sx, y: sy, size: 46, color: C.paper, borderColor: C.red, borderWidth: 2 });
   page.drawCircle({ x: sx, y: sy, size: 39, borderColor: C.charcoal, borderWidth: 0.6 });
   page.drawCircle({ x: sx, y: sy, size: 27, color: C.tint, borderWidth: 0 });
   // Caps about 0.7 of the size tall: set at r = 40.2 they stay between the rings (39 and 45).
-  if (!isRtl(issuerCaps)) arcText(page, `${issuerCaps} · CERTIFIED`, latin.bold, 5.8, sx, sy, 40.2, C.red);
-  if (groupMark) {
-    const h = 28;
-    const w = (groupMark.width / groupMark.height) * h;
-    page.drawImage(groupMark, { x: sx - w / 2, y: sy - 13, width: w, height: h });
-  } else tcMark(page, sx - 9.5, sy + 15, 30);
+  if (!isRtl(caps)) arcText(page, `${caps} · CERTIFIED`, latin.bold, 5.8, sx, sy, 40.2, C.red);
+  tcMark(page, sx - 9.5, sy + 15, 30);
   ts.centred(String(d.issuedAt.getUTCFullYear()), "bold", 7, sy - 24, C.charcoal, sx);
 
-  // Verification.
-  const qr = await pdf.embedPng(Buffer.from((await QRCode.toDataURL(d.verifyUrl, { margin: 0, width: 220 })).split(",")[1], "base64"));
-  page.drawImage(qr, { x: W - 56 - 46, y: H - 146, width: 46, height: 46 });
-  const scan = "Scan to verify";
-  page.drawText(scan, { x: W - 56 - 23 - latin.regular.widthOfTextAtSize(scan, 6.5) / 2, y: H - 156, size: 6.5, font: latin.regular, color: C.muted });
   ts.centred(`Verify this certificate at ${d.verifyUrl.replace(/^https?:\/\//, "")}`, "regular", 7, 40, C.muted);
+}
+
+/**
+ * T-CAP, after the T-GROUP logo: white paper, charcoal and steel instead of
+ * red, cut corners and a honeycomb that echo its hexagon, a geometric sans for
+ * the fixed words, and a hexagonal seal carrying the mark.
+ */
+async function drawTcap(ctx: Ctx) {
+  const { pdf, page, d } = ctx;
+  const T = {
+    ink: rgb(0.149, 0.149, 0.149), // #262626
+    logo: rgb(0.239, 0.239, 0.239), // #3D3D3D, the logo's grey
+    steel: rgb(0.44, 0.45, 0.47), // #707378
+    line: rgb(0.855, 0.859, 0.867), // #DADBDD
+    comb: rgb(0.78, 0.785, 0.795),
+  };
+  const ink: Ink = { title: T.ink, text: T.logo, soft: T.steel, line: T.line };
+  const sans = await pdf.embedFont(StandardFonts.Helvetica);
+  const sansBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const art = groupLogo();
+  const logo = await pdf.embedPng(art.logo);
+  const mark = await pdf.embedPng(art.mark);
+
+  page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: rgb(1, 1, 1) });
+
+  // Honeycomb in two corners, kept clear of the text.
+  const r = 15;
+  const dx = Math.sqrt(3) * r;
+  const dy = 1.5 * r;
+  for (const [cx, cy] of [
+    [34, H - 34],
+    [W - 34, 34],
+  ] as const) {
+    for (let row = -8; row <= 8; row++) {
+      for (let col = -8; col <= 8; col++) {
+        const x = cx + col * dx + (row % 2 ? dx / 2 : 0);
+        const y = cy + row * dy;
+        const dist = Math.hypot(x - cx, y - cy);
+        if (dist > 118 || x < 40 || x > W - 40 || y < 40 || y > H - 40) continue;
+        const fade = 1 - dist / 118;
+        page.drawSvgPath(hexPath(r - 1.5), { x, y, borderColor: T.comb, borderWidth: 0.7, borderOpacity: 0.25 + 0.55 * fade });
+        if ((row * 7 + col * 3) % 5 === 0) page.drawSvgPath(hexPath(r - 4), { x, y, color: T.logo, opacity: 0.05 + 0.1 * fade, borderWidth: 0 });
+      }
+    }
+  }
+
+  // Frame: two chamfered borders and a small hexagon on each cut.
+  chamfered(page, 18, 18, W - 18, H - 18, 26, T.logo, 1.4);
+  chamfered(page, 26, 26, W - 26, H - 26, 22, T.line, 0.7);
+  for (const [x, y] of [
+    [18 + 13, 18 + 13],
+    [W - 18 - 13, 18 + 13],
+    [18 + 13, H - 18 - 13],
+    [W - 18 - 13, H - 18 - 13],
+  ] as const) {
+    page.drawSvgPath(hexPath(5.5), { x, y, color: T.logo, borderWidth: 0 });
+  }
+
+  // The logo, centred.
+  const lh = 44;
+  const lw = (logo.width / logo.height) * lh;
+  page.drawImage(logo, { x: W / 2 - lw / 2, y: H - 46 - lh, width: lw, height: lh });
+  tracked(page, "T&C AI ACADEMY", sans, 6.5, H - 104, T.steel, 2.2);
+
+  // Number and QR code at the right.
+  const label = "CERTIFICATE NO.";
+  page.drawText(label, { x: W - 60 - sans.widthOfTextAtSize(label, 6.5), y: H - 62, size: 6.5, font: sans, color: T.steel });
+  page.drawText(d.code, { x: W - 60 - sansBold.widthOfTextAtSize(d.code, 9.5), y: H - 75, size: 9.5, font: sansBold, color: T.ink });
+  await qrCode(ctx, d.verifyUrl, W - 60 - 44, H - 128, 44);
+  const scan = "SCAN TO VERIFY";
+  page.drawText(scan, { x: W - 60 - 22 - sans.widthOfTextAtSize(scan, 5.5) / 2, y: H - 137, size: 5.5, font: sans, color: T.steel });
+
+  // Title in the logo's geometric spirit.
+  tracked(page, "CERTIFICATE", sansBold, 32, H - 156, T.logo, 11);
+  tracked(page, d.kind === "PROGRAM" ? "OF ACHIEVEMENT" : "OF COMPLETION", sans, 10.5, H - 176, T.steel, 6);
+  page.drawLine({ start: { x: W / 2 - 120, y: H - 190 }, end: { x: W / 2 - 12, y: H - 190 }, thickness: 0.7, color: T.steel });
+  page.drawLine({ start: { x: W / 2 + 12, y: H - 190 }, end: { x: W / 2 + 120, y: H - 190 }, thickness: 0.7, color: T.steel });
+  page.drawSvgPath(hexPath(5.5), { x: W / 2, y: H - 190, borderColor: T.logo, borderWidth: 1 });
+  page.drawSvgPath(hexPath(2.4), { x: W / 2, y: H - 190, color: T.logo, borderWidth: 0 });
+
+  body(ctx, ink, H - 220, sans);
+
+  // Signature and seal: one signatory on the left, the seal on the right; two
+  // signatories either side of a centred seal.
+  const sigY = 80;
+  const count = d.signatories.filter((s) => s.name.trim()).length;
+  const sealX = count >= 2 ? W / 2 : W / 2 + 190;
+  signatures(ctx, ink, count >= 2 ? [W / 2 - 235, W / 2 + 235] : [W / 2 - 190], sigY);
+
+  const sy = sigY + 24;
+  page.drawSvgPath(hexPath(52), { x: sealX, y: sy, color: rgb(1, 1, 1), borderColor: T.logo, borderWidth: 2.2 });
+  page.drawSvgPath(hexPath(45), { x: sealX, y: sy, borderColor: T.steel, borderWidth: 0.6 });
+  const mh = 34;
+  const mw = (mark.width / mark.height) * mh;
+  page.drawImage(mark, { x: sealX - mw / 2, y: sy - 8, width: mw, height: mh });
+  tracked(page, "CERTIFIED", sansBold, 6, sy - 17, T.logo, 2.4, sealX);
+  tracked(page, String(d.issuedAt.getUTCFullYear()), sans, 6.5, sy - 27, T.steel, 1.5, sealX);
+
+  const verify = `Verify this certificate at ${d.verifyUrl.replace(/^https?:\/\//, "")}`;
+  const vw = sans.widthOfTextAtSize(verify, 6.8);
+  page.drawText(verify, { x: W / 2 - vw / 2, y: 38, size: 6.8, font: sans, color: T.steel });
+}
+
+export async function drawCertificate(d: CertificateDesign): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
+  pdf.setTitle(`${d.title} — ${d.recipient}`);
+  pdf.setAuthor(d.issuer.name);
+  pdf.setSubject("Certificate of completion");
+  pdf.setCreator("T&C AI Academy");
+
+  const f = fontFiles();
+  const latin: Latin = {
+    regular: await pdf.embedFont(f["NotoSerif-Regular"], { subset: true }),
+    bold: await pdf.embedFont(f["NotoSerif-Bold"], { subset: true }),
+    italic: await pdf.embedFont(f["NotoSerif-Italic"], { subset: true }),
+  };
+  const page = pdf.addPage([W, H]);
+  const ctx: Ctx = { pdf, page, ts: new Typesetter(page, latin), latin, d };
+
+  if (d.issuer.key === "TCAP") await drawTcap(ctx);
+  else await drawTc(ctx);
 
   return pdf.save();
 }
