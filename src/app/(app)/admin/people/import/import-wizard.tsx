@@ -91,10 +91,15 @@ export function ImportWizard() {
   const msg = useMessage();
   const [previewState, preview] = useActionState<ImportState, FormData>(previewImportAction, {});
   // The previous state is not sent back to the server: it holds the passwords
-  // just issued. They stay on screen, and a second commit adds to them.
+  // just issued. They stay on screen — a second commit adds to them, and one
+  // that fails does not wipe them.
   const [commitState, commit] = useActionState<ImportState, FormData>(async (prev, formData) => {
-    const next = await commitImportAction({}, formData);
-    return { ...next, credentials: [...(prev.credentials ?? []), ...(next.credentials ?? [])] };
+    try {
+      const next = await commitImportAction({}, formData);
+      return { ...next, credentials: [...(prev.credentials ?? []), ...(next.credentials ?? [])] };
+    } catch {
+      return { error: "errors.generic", credentials: prev.credentials };
+    }
   }, {});
 
   const result = previewState.preview;
