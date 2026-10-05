@@ -295,7 +295,7 @@
 <tbody>
 <tr><td>That employee ID or password is not correct.</td><td>The ID, email or password does not match. The academy does not say which one is wrong.</td><td>Check and try again, or use <span class="ui">Forgot password?</span></td></tr>
 <tr><td>Too many attempts. Try again in N minutes.</td><td>The account is locked for a while (see "Locked out" below).</td><td>Wait, or reset your password.</td></tr>
-<tr><td>This account is not active. Please contact HR.</td><td>The account was deactivated, or its status is still Invited.</td><td>If you have never signed in, try <span class="ui">Create your account</span>. Otherwise contact HR.</td></tr>
+<tr><td>This account is not active. Please contact HR.</td><td>The account was deactivated, or its status is still Invited.</td><td>If you have never signed in and HR has not given you a temporary password, try <span class="ui">Create your account</span>. Otherwise contact HR.</td></tr>
 <tr><td>Single sign-on did not complete. Try again, or sign in with your password.</td><td>The company sign-in did not finish.</td><td>Try again, or use your password.</td></tr>
 <tr><td>Your company account is not linked to an active academy account. Please contact HR.</td><td>No active academy account has your company email.</td><td>Contact HR.</td></tr>
 </tbody>
@@ -313,12 +313,12 @@
 <ul>
 <li>HR has added you, and the employee ID and email match the record.</li>
 <li>The account has never been signed in to.</li>
-<li>HR added you on the People page or by spreadsheet import, or set your status to Invited.</li>
+<li>HR added you on the People page, and nobody has given you a temporary password for the account yet. Accounts created by spreadsheet import, and accounts an administrator has given a temporary password with <span class="ui">Change password</span>, cannot be activated here. Sign in with the temporary password instead.</li>
 <li>The account has not been deactivated.</li>
 </ul>
-<p>If any of these is not true, you always see the same message: <span class="ui">We could not set up an account with those details. Check your employee ID and work email — and if you have signed in before, use Sign in instead. Ask HR if the problem continues.</span> The message is the same whatever the reason, so the page cannot be used to find out who works at the company. After 5 tries for the same employee ID within 15 minutes, you see <span class="ui">Too many attempts. Please wait a few minutes and try again.</span></p>
+<p>If any of these is not true, you always see the same message: <span class="ui">We could not set up an account with those details. Check your employee ID and work email. If HR gave you a temporary password, or you have signed in before, use Sign in instead. Ask HR if the problem continues.</span> The message is the same whatever the reason, so the page cannot be used to find out who works at the company. After 5 tries for the same employee ID within 15 minutes, you see <span class="ui">Too many attempts. Please wait a few minutes and try again.</span></p>
 <div class="callout warn"><strong>Limits.</strong> Activation cannot reactivate a deactivated account. If you have signed in before, use <span class="ui">Sign in</span> or <span class="ui">Forgot password?</span> instead. People added through the HR sync cannot activate here. They sign in with single sign-on, or set a password with <span class="ui">Forgot password?</span>. When single sign-on is set up, activation is turned off and the form answers <span class="ui">Your company signs in with single sign-on. Use the sign-in button on the sign-in page instead.</span></div>
-<div class="callout note"><strong>For administrators.</strong> Activation only checks an employee ID and an email address, and a colleague could know both. Every successful activation is written to the audit log. So is every attempt refused because the ID or email did not match or the account was already used. A Super Admin can review these in the <span class="ui">Audit log</span>.</div>
+<div class="callout note"><strong>For administrators.</strong> Activation only checks an employee ID and an email address, and a colleague could know both. Every successful activation is written to the audit log. So is every attempt refused because the ID or email did not match or the account could not be claimed (for example, it was already used or it has a temporary password). A Super Admin can review these in the <span class="ui">Audit log</span>. If someone added on the People page cannot activate their account, select <span class="ui">Change password</span> on their People record and give them the temporary password instead.</div>
 
 <h3>Forgot your password</h3>
 <ol class="steps">
@@ -336,23 +336,23 @@
 <li>Open <span class="ui">Profile</span>. Under <span class="ui">Security</span>, select <span class="ui">Change password</span>.</li>
 <li>Enter your <span class="ui">Current password</span>, then your <span class="ui">New password</span> twice, and select <span class="ui">Change password</span>.</li>
 </ol>
-<p>This screen has no menu and no Back link. If you change your mind, use your browser's Back button. Changing your password here does not sign you out on other devices. A reset through <span class="ui">Forgot password?</span> does. Under <span class="ui">Security</span> you also see <span class="ui">Recent sign-ins</span>: your last 8 sign-in attempts, with the time, network address and OK or Failed.</p>
+<p>This screen has no menu and no Back link. If you change your mind, use your browser's Back button. The new password must be different from your current one. Changing your password here signs you out on all your other devices. You stay signed in on this one. Under <span class="ui">Security</span> you also see <span class="ui">Recent sign-ins</span>: your last 8 sign-in attempts, with the time, network address and OK or Failed.</p>
 
 <h3>Temporary passwords and the forced password change</h3>
 <p>How you get a temporary password depends on how HR added you:</p>
 <ul>
-<li><strong>Spreadsheet import:</strong> the administrator types one <span class="ui">Temporary password for new employees</span> for everyone created in that import, and tells you what it is.</li>
-<li><strong>People page:</strong> the account gets a random password that nobody sees. You can activate it yourself with <span class="ui">Create your account</span>. Or an administrator can give you a temporary password with <span class="ui">Change password</span>, as below.</li>
-<li><strong>Change password on your People record:</strong> an administrator selects <span class="ui">Change password</span> under <span class="ui">Actions</span>. The new password appears once as <span class="ui">A temporary password has been set: …</span>, and the administrator gives it to you. This also signs you out everywhere and lifts any lockout. Only a Super Admin can do this for an administrator.</li>
+<li><strong>Spreadsheet import:</strong> every new person gets a temporary password of their own. Right after the import, the administrator sees a <span class="ui">Temporary passwords</span> card that lists each new person's <span class="ui">Employee ID</span>, <span class="ui">Full name</span> and <span class="ui">Temporary password</span>, and can save the list with <span class="ui">Download the list (CSV)</span>. The list is shown only once and is not saved anywhere. The administrator gives each person only their own password. People who were already in the academy keep their password. An imported account cannot be activated with <span class="ui">Create your account</span>. Sign in with your employee ID and the temporary password instead.</li>
+<li><strong>People page:</strong> the account has no password yet. You can activate it yourself with <span class="ui">Create your account</span>. Or an administrator can give you a temporary password with <span class="ui">Change password</span>, as below.</li>
+<li><strong>Change password on your People record:</strong> an administrator selects <span class="ui">Change password</span> under <span class="ui">Actions</span>. The new password appears once as <span class="ui">A temporary password has been set: …</span>, and the administrator gives it to you. This also signs you out everywhere and lifts any lockout. Only a Super Admin can do this for an administrator. After this, the account can no longer be activated with <span class="ui">Create your account</span>. If its <span class="ui">Status</span> is <span class="ui">Invited</span>, the administrator must also set it to <span class="ui">Active</span>, because an Invited account cannot sign in.</li>
 </ul>
 <ol class="steps">
 <li>Sign in with the temporary password.</li>
 <li>The <span class="ui">Choose a new password</span> screen opens. In <span class="ui">Current password</span>, type the temporary password.</li>
-<li>Enter a <span class="ui">New password</span> and repeat it in <span class="ui">Confirm password</span>. It must be at least 10 characters, with a letter and a number.</li>
-<li>Select <span class="ui">Change password</span>. You arrive on <span class="ui">Home</span>.</li>
+<li>Enter a <span class="ui">New password</span> and repeat it in <span class="ui">Confirm password</span>. It must be at least 10 characters, with a letter and a number, and it must be different from the temporary password.</li>
+<li>Select <span class="ui">Change password</span>. You arrive on <span class="ui">Home</span>. You stay signed in on this device, and the account is signed out everywhere else.</li>
 </ol>
-<p>If the current password is wrong, the screen says <span class="ui">That employee ID or password is not correct.</span> Until you finish, every academy page sends you back to this screen. The screen has no <span class="ui">Sign out</span> button and no language selector.</p>
-<div class="callout note"><strong>Single sign-on and temporary passwords.</strong> People added on the People page or by spreadsheet import still have to replace their temporary password. After signing in with single sign-on, they are still sent to <span class="ui">Choose a new password</span>, and they need a temporary password from HR to get past it. Accounts created through the HR sync (SCIM) skip this step.</div>
+<p>If the current password is wrong, the screen says <span class="ui">That employee ID or password is not correct.</span> If you type the temporary password again as the new one, it says <span class="ui">Your new password must be different from your current one.</span> Until you finish, every academy page sends you back to this screen. The screen has no <span class="ui">Sign out</span> button and no language selector.</p>
+<div class="callout note"><strong>Single sign-on and temporary passwords.</strong> People added on the People page or by spreadsheet import still have to set their own password. After signing in with single sign-on, they are still sent to <span class="ui">Choose a new password</span>, and they need a temporary password from HR to get past it. Accounts created through the HR sync (SCIM) skip this step.</div>
 
 <h3>Locked out after failed attempts</h3>
 <p>After 5 wrong passwords, the account is locked for 15 minutes. While it is locked, even the right password is refused, and you see <span class="ui">Too many attempts. Try again in N minutes.</span> A Super Admin can change both numbers in <span class="ui">Settings</span>: <span class="ui">Failed logins before lockout</span> and <span class="ui">Lockout duration (minutes)</span>.</p>
@@ -447,7 +447,7 @@
 <li>On a phone, open the menu first.</li>
 <li>At the bottom of the menu, select <span class="ui">Sign out</span>. You return to the sign-in page.</li>
 </ol>
-<p>Signing out ends your session on this device. It also clears the academy files stored on the device, and any offline progress not yet sent. It does not sign you out on your other devices. A password reset, or an administrator's <span class="ui">Change password</span>, does. Closing the browser does not sign you out, because a sign-in lasts for the full session length (12 hours unless changed). Always sign out on a shared phone or computer.</p>
+<p>Signing out ends your session on this device. It also clears the academy files stored on the device, and any offline progress not yet sent. It does not sign you out on your other devices. Changing your password, a password reset, or an administrator's <span class="ui">Change password</span>, does. Closing the browser does not sign you out, because a sign-in lasts for the full session length (12 hours unless changed). Always sign out on a shared phone or computer.</p>
 </section>
 
 <section id="learning">
@@ -1184,10 +1184,10 @@
 <li>Choose a <span class="ui">Status</span> (the default is Active). Tick roles under <span class="ui">Roles &amp; permissions</span>. EMPLOYEE is ticked to start with, and if you untick every role the person still gets Employee.</li>
 <li>Click <span class="ui">Save</span>.</li>
 </ol>
-<p>The Employee ID and the email must both be unique. If either clashes with someone else, you see "Please check the highlighted fields." A new account starts with a random password that nobody knows. There are three ways to let the person in:</p>
+<p>The Employee ID and the email must both be unique. If either clashes with someone else, you see "Please check the highlighted fields." A new account starts with no password at all. There are three ways to let the person in:</p>
 <ul>
-<li>Open their record, use <span class="ui">Change password</span>, and give them the temporary password.</li>
-<li>The person claims the account themselves at <span class="path">/register</span> with their Employee ID and the same email. This only works for an account that has never been signed in to, and not when single sign-on is configured.</li>
+<li>Open their record, use <span class="ui">Change password</span>, and give them the temporary password. After that, the account can no longer be claimed at <span class="path">/register</span>.</li>
+<li>The person claims the account themselves at <span class="path">/register</span> with their Employee ID and the same email. This only works while nobody has been given a password for the account: it was added on this page, has never been signed in to, has never been given a temporary password with <span class="ui">Change password</span>, and is not Inactive. It does not work when single sign-on is configured.</li>
 <li>If single sign-on is configured, an Active person signs in with their company account. The email on their record must match that account.</li>
 </ul>
 
@@ -1195,13 +1195,13 @@
 <ul>
 <li><span class="ui">Active</span>: can sign in. Only Active people are included when learning is assigned to a group. Only Active people appear in the lists of possible managers and instructors.</li>
 <li><span class="ui">Inactive</span>: cannot sign in, and is signed out on their next click. Their history is kept.</li>
-<li><span class="ui">Invited</span>: cannot sign in, even after <span class="ui">Change password</span>. Claiming the account at <span class="path">/register</span> makes them Active. If single sign-on is configured, <span class="path">/register</span> is closed, so you must set them to Active yourself.</li>
+<li><span class="ui">Invited</span>: cannot sign in, even after <span class="ui">Change password</span>. Claiming the account at <span class="path">/register</span> makes them Active. Once you have used <span class="ui">Change password</span> on the account, it can no longer be claimed, so you must set them to Active yourself. The same applies if single sign-on is configured, because <span class="path">/register</span> is then closed.</li>
 </ul>
 
 <h4>A person's record</h4>
 <p>Click <span class="ui">Edit</span> on a row. Below the form, the record shows <span class="ui">Assessment history</span>, the person's enrolments (under <span class="ui">My Learning</span>), a count of their valid certificates and <span class="ui">Recent sign-ins</span>. The <span class="ui">Actions</span> card has three buttons:</p>
 <ul>
-<li><span class="ui">Change password</span> creates a temporary password and shows it <strong>once</strong>. It also unlocks the account and signs the person out everywhere. They must choose a new password the next time they sign in.</li>
+<li><span class="ui">Change password</span> creates a temporary password and shows it <strong>once</strong>. It also unlocks the account and signs the person out everywhere. They must choose a new password the next time they sign in. The new password must be different from the temporary one, and choosing it signs them out on every other device or browser.</li>
 <li><span class="ui">Run recommendation</span> rebuilds the person's suggested learning and notifies them.</li>
 <li>The third button is labelled with the status it will switch to: <span class="ui">Inactive</span> (red) or <span class="ui">Active</span>. It acts straight away, without asking you to confirm. Deactivating also signs the person out at once.</li>
 </ul>
@@ -1214,9 +1214,10 @@
 <li>On People, click <span class="ui">Import employees</span>. If you need the template, click <span class="ui">Download template</span>.</li>
 <li>Choose an Excel (.xlsx) or CSV file of up to 4 MB, then click <span class="ui">Upload</span>. Nothing is saved at this step.</li>
 <li>Check the preview. It shows the counts (<span class="ui">Rows</span>, <span class="ui">Valid</span>, <span class="ui">Invalid</span>, <span class="ui">Duplicates</span>, <span class="ui">New employees</span>), a <span class="ui">Values not found in the system</span> box when names are not recognised, and each row's status (NEW, EXISTING, INVALID or DUPLICATE) with its <span class="ui">Issues</span>. The table shows only the first 200 rows, but every row is imported.</li>
-<li>Enter a <span class="ui">Temporary password for new employees</span> of at least 10 characters. Give this password to the new people, or let them claim their accounts at <span class="path">/register</span>.</li>
 <li>Click <span class="ui">Confirm — N</span>. The result reads "X created · Y updated · Z skipped".</li>
+<li>If new people were created, a <span class="ui">Temporary passwords</span> card appears below. It lists each new person's <span class="ui">Employee ID</span>, <span class="ui">Full name</span> and <span class="ui">Temporary password</span>. Click <span class="ui">Download the list (CSV)</span> to save it as a spreadsheet with the columns Employee ID, Full name, Email and Temporary password. The list is shown only once and is not saved anywhere, so download it before you leave the page.</li>
 </ol>
+<div class="callout note"><strong>Temporary passwords.</strong> You do not choose a password for the import. Each new person gets a temporary password of their own. Give each person only their own password. They sign in with their Employee ID and that password, and must choose a new password at first sign-in. Imported people cannot claim their accounts at <span class="path">/register</span>. The downloaded file contains passwords, so keep it safe and delete it once everyone has theirs. The audit log records only how many people were created, updated and skipped, never the passwords.</div>
 <div class="table-wrap"><table class="ref">
 <thead><tr><th>Column</th><th>Rules</th></tr></thead>
 <tbody>
@@ -1231,8 +1232,8 @@
 </table></div>
 <p>Column order and header capitals do not matter, and extra columns are ignored. If an Employee ID or email appears twice in the file, the second row is marked DUPLICATE and skipped. New people get the Employee role. Existing people keep their roles and passwords.</p>
 <div class="callout warn"><strong>Updates overwrite.</strong> In an update, blank Department, Section, Job Title or Location cells clear those fields. A blank AI Experience becomes NONE and a blank Weekly Hours becomes 2. Every imported person is set to Active, including people who were deactivated or Invited, so remove leavers from the file first. Rows for administrators are skipped unless a Super Admin runs the import, and those skipped rows are not counted in the result.</div>
-<div class="callout warn"><strong>Email already used by another Employee ID.</strong> If an email in the file already belongs to someone with a different Employee ID, the import stops with an error part-way through. Rows before that one are already saved. Fix the row and import again.</div>
-<div class="callout tip"><strong>Tip.</strong> Type Employee IDs, manager Employee IDs, department names or codes, job titles and locations exactly as the app shows them, including capital letters. The preview ignores capitals but saving does not. A mismatch can leave a field empty, leave a manager unlinked, or stop the import.</div>
+<div class="callout warn"><strong>Email already used by another Employee ID.</strong> If an email in the file already belongs to someone with a different Employee ID, the preview marks that row INVALID and it is skipped. The rest of the file is still imported. Fix the row and import it again.</div>
+<div class="callout tip"><strong>Tip.</strong> Department names or codes, job titles and locations are matched whatever their capital letters, just as in the preview. Type Employee IDs, manager Employee IDs and section names exactly as the app shows them, including capital letters. The preview ignores capitals in Employee IDs but saving does not. A mismatch can leave a section empty, leave a manager unlinked, skip the row, or add the person a second time.</div>
 
 <h3>Departments &amp; job titles</h3>
 <p>The <span class="ui">Departments</span> menu item opens <span class="path">/admin/org</span>. Nothing on this page can be deleted, and sections and locations cannot be renamed.</p>
@@ -1642,7 +1643,7 @@ Saving a job title recalculates its skill requirements.</li>
 <h3>Known limitations for administrators</h3>
 <ul>
 <li>Courses have no detail page. Course links on the Skills, Career and Team pages open the Course Catalog, searched for that course.</li>
-<li><span class="path">/register</span> only lets someone claim an account HR already created. The person must never have signed in, and the email must match. It cannot reactivate a deactivated account, and it is closed when single sign-on is set up.</li>
+<li><span class="path">/register</span> (<span class="ui">Create your account</span>) only lets someone claim an account that was added on the <span class="ui">People</span> page and that nobody has a password for yet. The person must never have signed in, and the email must match. An account that has been given a temporary password, by a spreadsheet import or with <span class="ui">Change password</span>, cannot be claimed. Its owner signs in with that temporary password instead. If such an account is still <span class="ui">Invited</span>, set it to <span class="ui">Active</span> first, because Invited accounts cannot sign in. <span class="path">/register</span> cannot reactivate a deactivated account, and it is closed when single sign-on is set up.</li>
 <li>Nothing AI-made is published automatically. AI-drafted courses open in the course editor as Draft. AI quiz questions arrive as Draft in their own question bank. Imported or discovered courses wait in the review queue (<span class="path">/admin/courses/review</span>).</li>
 <li><span class="ui">Import training history</span> on <span class="path">/admin/enrollments</span> adds one record at a time. It is not a file import.</li>
 <li>Branding cannot be changed in the app. <span class="ui">Default language</span> is saved but not used anywhere. <span class="ui">Course review interval (days)</span> in Settings is not used either: each course has its own interval in the course editor, and new courses start at 180 days.</li>
@@ -1865,7 +1866,7 @@ npx tsx scripts/run-jobs.mts --only backup</code></pre>
 <tbody>
 <tr><td>Session cookie</td><td><code>__Host-tcai_session</code>: HttpOnly, Secure, SameSite=Lax. It holds a random token that is stored only as a hash. Its length is set in <span class="ui">Session length (hours)</span> (default 12). A deactivated account is signed out on its next request.</td></tr>
 <tr><td>Lockout</td><td>Set with <span class="ui">Failed logins before lockout</span> (default 5) and <span class="ui">Lockout duration (minutes)</span> (default 15). Every attempt is logged with its IP address and browser, and shown under <span class="ui">Recent sign-ins</span> on the person's page in <span class="ui">People</span> and on their own <span class="ui">Profile</span>.</td></tr>
-<tr><td>Passwords</td><td>Stored with bcrypt (cost 12). A new password needs at least 10 characters with letters and digits. Reset links last one hour.</td></tr>
+<tr><td>Passwords</td><td>Stored with bcrypt (cost 12). A new password needs at least 10 characters with letters and digits. Reset links last one hour. <span class="ui">Import employees</span> gives each new person a random temporary password of their own. The administrator sees the list once. It is never saved in readable form, and the audit log records only how many people were created, updated and skipped. These temporary passwords are stored with bcrypt cost 8, which is enough for a long random value and keeps large imports fast. At first sign-in, on <span class="ui">Choose a new password</span>, the new password must be different from the temporary one, and every other session of that account is signed out.</td></tr>
 <tr><td>Rate limits</td><td>API: 120 per minute per key. Registration: 5 per 15 minutes per employee code. Public certificate verification page: 20 lookups per minute per connection (IP address). Per person: AI coach 20 per minute, course search 120 per minute, exports 10 per minute, executive report 5 per minute. Limits are kept in memory and reset on restart.</td></tr>
 <tr><td>Security headers</td><td><code>X-Frame-Options: SAMEORIGIN</code>, <code>frame-ancestors 'self'</code>, <code>nosniff</code>, <code>strict-origin-when-cross-origin</code>, a restrictive <code>Permissions-Policy</code>, and HSTS for one year. SCORM files are served with their own Content-Security-Policy instead.</td></tr>
 <tr><td>Audit log</td><td><span class="path">/admin/audit</span> (Super Admin, <span class="perm">audit.view</span>), with <span class="ui">Export to Excel</span>. It records sign-ins, admin changes, HR sync, API keys, webhooks and jobs. Password, token and secret fields are redacted.</td></tr>

@@ -158,8 +158,16 @@ export async function validateEmployeeRows(headers: string[], rows: ParsedRow[])
       }
     }
 
+    // An email belongs to one person: saving this row would fail.
+    const owner = byEmail.get(emailKey);
+    if (owner && owner.employeeCode.toLowerCase() !== codeKey) {
+      issues.push(`Email already belongs to employee ${owner.employeeCode}`);
+    }
+
     const exists = byCode.has(codeKey) || byEmail.has(emailKey);
-    const blocking = issues.some((m) => m.startsWith("Unknown department") || m.startsWith("Language"));
+    const blocking = issues.some(
+      (m) => m.startsWith("Unknown department") || m.startsWith("Language") || m.startsWith("Email already belongs"),
+    );
 
     return {
       line: i + 2,
@@ -221,6 +229,7 @@ export async function commitEmployeeImport(preview: ImportPreview, canTouchPrivi
   let updated = 0;
   let conflicts = 0;
   const credentials: TemporaryCredential[] = [];
+  const saved = new Set<string>();
 
   for (const row of importable) {
     const d = row.data!;
@@ -271,6 +280,7 @@ export async function commitEmployeeImport(preview: ImportPreview, canTouchPrivi
       conflicts++;
       continue;
     }
+    saved.add(d.employeeCode);
     if (password) credentials.push({ employeeCode: d.employeeCode, fullName: d.fullName, email: d.email, password });
 
     if (existing) updated++;
@@ -304,9 +314,10 @@ export async function commitEmployeeImport(preview: ImportPreview, canTouchPrivi
   }
 
   // Manager links resolved afterwards so order in the file does not matter.
+  // Only for rows saved above: a skipped row has no one to link.
   for (const row of importable) {
     const d = row.data!;
-    if (!d.managerCode) continue;
+    if (!d.managerCode || !saved.has(d.employeeCode)) continue;
     const manager = await prisma.user.findUnique({ where: { employeeCode: d.managerCode } });
     if (manager) {
       await prisma.user.update({ where: { employeeCode: d.employeeCode }, data: { managerId: manager.id } });

@@ -35,15 +35,21 @@ function CommitSubmit({ count }: { count: number }) {
 function TemporaryPasswords({ list }: { list: TemporaryCredential[] }) {
   const t = useT();
   const download = () => {
-    // Excel reads a cell starting = + - @ as a formula; a leading quote keeps it text.
-    const cell = (v: string) => `"${(/^[=+\-@]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`;
+    // Excel reads a cell starting = + - @ (or a tab or return) as a formula; a leading quote keeps it text.
+    const cell = (v: string) => `"${(/^[=+\-@\t\r]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`;
     const rows = [
       [t("profile.employeeId"), t("profile.fullName"), t("profile.email"), t("form.temporaryPassword")],
       ...list.map((c) => [c.employeeCode, c.fullName, c.email, c.password]),
     ];
-    // The byte-order mark makes Excel open Arabic and Turkish names as UTF-8.
-    const csv = `\uFEFF${rows.map((r) => r.map(cell).join(",")).join("\r\n")}`;
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    // Tab-separated UTF-16 with a byte-order mark: Excel opens it in columns
+    // whatever the region's list separator, with Arabic and Turkish intact.
+    const text = `\uFEFF${rows.map((r) => r.map(cell).join("\t")).join("\r\n")}`;
+    const bytes = new Uint8Array(text.length * 2);
+    for (let i = 0; i < text.length; i++) {
+      bytes[i * 2] = text.charCodeAt(i) & 0xff;
+      bytes[i * 2 + 1] = text.charCodeAt(i) >> 8;
+    }
+    const url = URL.createObjectURL(new Blob([bytes], { type: "text/csv;charset=utf-16le" }));
     const a = document.createElement("a");
     a.href = url;
     a.download = "temporary-passwords.csv";
@@ -71,9 +77,7 @@ function TemporaryPasswords({ list }: { list: TemporaryCredential[] }) {
             <tr key={c.employeeCode}>
               <td className="font-mono text-[12px]">{c.employeeCode}</td>
               <td>{c.fullName}</td>
-              <td className="font-mono text-[12px]" dir="ltr">
-                {c.password}
-              </td>
+              <td className="font-mono text-[12px]">{c.password}</td>
             </tr>
           ))}
         </tbody>
@@ -86,7 +90,12 @@ export function ImportWizard() {
   const t = useT();
   const msg = useMessage();
   const [previewState, preview] = useActionState<ImportState, FormData>(previewImportAction, {});
-  const [commitState, commit] = useActionState<ImportState, FormData>(commitImportAction, {});
+  // The previous state is not sent back to the server: it holds the passwords
+  // just issued. They stay on screen, and a second commit adds to them.
+  const [commitState, commit] = useActionState<ImportState, FormData>(async (prev, formData) => {
+    const next = await commitImportAction({}, formData);
+    return { ...next, credentials: [...(prev.credentials ?? []), ...(next.credentials ?? [])] };
+  }, {});
 
   const result = previewState.preview;
   const importable = result?.rows.filter((r) => r.status === "NEW" || r.status === "EXISTING") ?? [];
@@ -204,10 +213,11 @@ export function ImportWizard() {
               <CommitSubmit count={importable.length} />
             </form>
           </Card>
-
-          {commitState.credentials?.length ? <TemporaryPasswords list={commitState.credentials} /> : null}
         </>
       ) : null}
+
+      {/* Outside the preview, so uploading another file does not hide passwords already issued. */}
+      {commitState.credentials?.length ? <TemporaryPasswords list={commitState.credentials} /> : null}
     </div>
   );
 }
