@@ -504,7 +504,7 @@
 <h3>A course page</h3>
 <p>The course page (<span class="path">/learning/&lt;id&gt;</span>) shows the description, <span class="ui">Expected outcome</span>, your progress and time spent, and a status: <span class="ui">Not Started</span>, <span class="ui">In Progress</span>, <span class="ui">Pending Verification</span> or <span class="ui">Completed</span>.</p>
 <h4>Courses inside the academy</h4>
-<p><span class="ui">Modules</span> lists every lesson, with a tick when done. Select <span class="ui">Start Course</span> or <span class="ui">Resume</span>, or open any lesson. Lessons marked <span class="ui">Optional</span> do not count; only required lessons do. When all required lessons are done the course completes and you are notified. T&amp;C internal courses also issue an academy certificate.</p>
+<p><span class="ui">Modules</span> lists every lesson, with a tick when done. Select <span class="ui">Start Course</span> or <span class="ui">Resume</span>, or open any lesson. Lessons marked <span class="ui">Optional</span> do not count; only required lessons do. When all required lessons are done the course completes and you are notified. T&amp;C internal courses also issue an academy certificate. A course from another provider whose lessons appear here earns a certificate only when someone confirms it: you are marked present at a classroom session for that course, or your manager signs it off. Ticking its lessons yourself (for example marking a video complete) earns none.</p>
 <h4>Courses hosted by another provider</h4>
 <ol class="steps">
 <li>Select <span class="ui">Open Course</span> and complete it in the new tab.</li>
@@ -512,17 +512,17 @@
 <li>Select <span class="ui">Upload certificate or proof</span>. The course becomes <span class="ui">Pending Verification</span>.</li>
 <li>The L&amp;D team checks it and you are notified.</li>
 </ol>
-<div class="callout warn"><strong>Upload proof.</strong> <span class="ui">I have completed this course</span> only sets <span class="ui">Pending Verification</span>; it never completes the course. L&amp;D can verify only an uploaded file. For courses from other providers the academy issues no certificate of its own; your uploaded certificate is the record.</div>
+<div class="callout warn"><strong>Upload proof.</strong> <span class="ui">I have completed this course</span> only sets <span class="ui">Pending Verification</span>; it never completes the course. L&amp;D can verify only an uploaded file. Once L&amp;D verifies your proof, the academy also issues its own certificate for the course.</div>
 <div class="table-wrap"><table class="ref">
 <thead><tr><th>Proof status</th><th>What happens</th></tr></thead>
 <tbody>
 <tr><td><span class="ui">Waiting for verification</span></td><td>Not checked yet.</td></tr>
-<tr><td><span class="ui">Verified</span></td><td>The course is <span class="ui">Completed</span>, unless it also needs supervisor sign-off.</td></tr>
+<tr><td><span class="ui">Verified</span></td><td>The course is <span class="ui">Completed</span> and its academy certificate is issued, unless it also needs supervisor sign-off.</td></tr>
 <tr><td><span class="ui">Needs another look</span></td><td>Rejected. The reviewer's note shows under the file and the course returns to <span class="ui">In Progress</span>. Upload a clearer proof.</td></tr>
 </tbody>
 </table></div>
 <h4>Supervisor sign-off</h4>
-<p>Some practical courses need your manager to watch you do the work. At 100% the page shows <span class="ui">Waiting for supervisor sign-off</span> and the course appears in your manager's <span class="ui">Practical sign-off</span> list on their My Team page. Your manager is not sent a separate message, so tell them when you are ready. When they confirm, the course completes and you are notified. If no manager is recorded for you, nobody sees it; ask HR.</p>
+<p>Some practical courses need your manager to watch you do the work. At 100% the page shows <span class="ui">Waiting for supervisor sign-off</span> and the course appears in your manager's <span class="ui">Practical sign-off</span> list on their My Team page. Your manager is not sent a separate message, so tell them when you are ready. When they confirm, the course completes, its academy certificate is issued and you are notified. If no manager is recorded for you, nobody sees it; ask HR.</p>
 <h4>Feedback</h4>
 <p>Once a course is <span class="ui">Completed</span>, <span class="ui">How was this course?</span> appears. Rate <span class="ui">How useful was this course?</span> and <span class="ui">How relevant was it to your work?</span> from 1 to 5, answer <span class="ui">Would you recommend it?</span>, add an optional comment and select <span class="ui">Submit</span>. After that the page shows a thank-you instead of the form.</p>
 
@@ -580,10 +580,9 @@
 <ul>
 <li>Registration is refused if the session is full with no waiting list, has already started, is cancelled, or overlaps another session you are booked or waiting for.</li>
 <li><span class="ui">Cancel my place</span> works until the session ends. If you held a place, the first person waiting gets it automatically and is notified.</li>
-<li>The organiser records attendance, and your card then shows <span class="ui">Attended</span> or <span class="ui">Absent</span>. If the session delivers a course, you are notified and the session hours are added to that course in My Learning.</li>
+<li>The organiser records attendance, and your card then shows <span class="ui">Attended</span> or <span class="ui">Absent</span>. If the session delivers a course, being marked present completes that course for you (it is added to My Learning if you did not have it), adds the session hours to it, and issues its academy certificate and any badges you have earned. You are notified.</li>
 <li>If a session is cancelled, it shows <span class="ui">Cancelled</span> and everyone booked or waiting is notified.</li>
 </ul>
-<div class="callout warn"><strong>Known limitation.</strong> In the current version, attending does not reliably mark the linked course <span class="ui">Completed</span>: it can still show <span class="ui">In Progress</span> at 100%, and attendance issues no academy certificate. If this happens to you, tell the L&amp;D team.</div>
 </section>
 
 <section id="assessments-certificates">
@@ -704,7 +703,13 @@
 
 <h3>Certificates</h3>
 <h4>Course certificates</h4>
-<p>You receive a certificate automatically when you complete an <strong>internal</strong> T&amp;C course, and a <span class="ui">Certificate issued</span> notification. This applies however the course was completed: through lessons, a SCORM package, a supervisor sign-off, or L&amp;D approving your proof. Courses taken on another provider's website do not get a T&amp;C certificate. If you complete recurring training again, you get a new certificate, and the earlier ones stay in your list.</p>
+<p>You receive a certificate automatically, and a <span class="ui">Certificate issued</span> notification, for every course you complete that has evidence behind it:</p>
+<ul>
+<li><strong>Internal T&amp;C courses</strong>, however they were completed: through lessons, a SCORM package, a supervisor sign-off, or L&amp;D approving your proof.</li>
+<li><strong>Courses from other providers</strong>, once L&amp;D verifies the proof you uploaded, once your attendance is marked at a classroom session for that course, or once a supervisor signs it off. The certificate says "Provided by" and names the provider.</li>
+</ul>
+<p>A course from another provider that you only marked complete yourself, for example a video, does not earn a certificate. If you complete recurring training again, you get a new certificate, and the earlier ones stay in your list. Courses completed before certificates covered all of these routes were given their certificates once, automatically, dated the day the course was completed and without a notification.</p>
+<p>Your certificates are issued by the company of your location: T&amp;C Garments or T-CAP. For example, "T-CAP Head Office" is a T-CAP location.</p>
 
 <h4>The programme certificate</h4>
 <p>Until you hold it, the <span class="ui">Certificates</span> page shows a checklist titled <span class="ui">Next development target</span>. Each line shows a tick once it is met:</p>
@@ -717,14 +722,37 @@
 <p>Below the checklist you see <span class="ui">Keep going</span>, or <span class="ui">Passed</span> once every line is met. The certificate is called "T&amp;C AI Academy — AI Capability Programme". It records the level and score from your best Final attempt.</p>
 <div class="callout warn"><strong>Order matters.</strong> The programme certificate is created only at the moment your workplace challenge is approved, and only if every other requirement is already met at that moment. It is not created later, and L&amp;D has no button to issue it by hand. An approved challenge cannot be reopened, so there is no way to fix this later. Make sure you have passed the Final and Responsible AI assessments <strong>before</strong> your challenge is approved. The safest order is to pass both before you submit it. Your dashboard suggests the challenge before the Final, but take the Final first anyway. The same rule applies if a Super Admin switches the challenge requirement off in Settings: the certificate is still created only when a challenge is approved.</div>
 
+<h4>Your name on certificates</h4>
+<p>Before your first download, you confirm how your name is printed. Until you do, the top of the <span class="ui">Certificates</span> page shows the <span class="ui">Your name on certificates</span> card, with your name as HR has it in the <span class="ui">Name as printed</span> box.</p>
+<ol class="steps">
+<li>Check the name. It must contain every part of your name as HR holds it, in the same order. You may add middle names, but not change or leave out a name. Use either Latin or Arabic letters, not both. Spaces, hyphens and apostrophes are allowed. An Arabic name is compared with the Arabic name HR holds for you.</li>
+<li>Click <span class="ui">Confirm my name</span>. You see <span class="ui">Name confirmed. You can download your certificates.</span></li>
+</ol>
+<p>You confirm your name only once. After that it is locked, and the page shows <span class="ui">Your certificates are issued to:</span> followed by your name. This name is printed on all your certificates, including earlier ones, and shown on the verification page. Until you confirm, each download button reads <span class="ui">Confirm your name to download</span>, and a download link opened directly brings you back to the card. If your name on record is wrong, or your confirmed name needs correcting, ask HR.</p>
+<p><strong>Correcting a name (HR).</strong> Open <span class="ui">Administration</span>, then <span class="ui">People</span>, and open the person. Change the <span class="ui">Name on certificates</span> field and save. This needs <span class="perm">users.manage</span>. The corrected name counts as confirmed. It must use Latin or Arabic letters, but it is not compared with the name on record. To ask the person to confirm their name again, clear the field.</p>
+
 <h4>Downloading and checking a certificate</h4>
 <ol class="steps">
 <li>Open <span class="ui">Certificates</span>. Each card shows the status (<span class="ui">Valid</span> or <span class="ui">Revoked</span>), the title, <span class="ui">Issued</span>, <span class="ui">Learning hours</span>, <span class="ui">Level</span> (programme certificate only) and <span class="ui">Certificate ID</span>, for example <code>TCAI-2026-000001</code>.</li>
-<li>Click <span class="ui">Download PDF</span>. You get an A4 landscape PDF named after the certificate ID. It has blank signature lines for the Head of Learning &amp; Development and Human Resources, and a QR code that opens the verification page.</li>
+<li>Click <span class="ui">Download PDF</span>. You get an A4 landscape PDF named after the certificate ID. If you have not confirmed your name yet, the button reads <span class="ui">Confirm your name to download</span> instead.</li>
 <li>Click <span class="ui">Verify</span> to see the public page that other people will see.</li>
 </ol>
-<div class="callout warn"><strong>Names with special letters.</strong> The PDF uses a basic Latin font. If your name or the certificate title contains Arabic letters, or Turkish letters such as ş, ğ or ı, the download fails. The verification page still works. Ask L&amp;D for help.</div>
+<p>The design depends on the company that issued the certificate:</p>
+<div class="table-wrap"><table class="ref">
+<thead><tr><th>Company</th><th>Design</th><th>Signed by (standard setting)</th></tr></thead>
+<tbody>
+<tr><td>T&amp;C Garments</td><td>The T&amp;C mark, a red frame and a round seal</td><td>Ahmed Tolba, Chief Executive Officer, and Enis Dancir</td></tr>
+<tr><td>T-CAP</td><td>The T-GROUP logo, charcoal colours and a hexagonal seal</td><td>Ahmed Tolba, Chief Executive Officer</td></tr>
+</tbody>
+</table></div>
+<p>Every certificate has a QR code at the top right that opens the verification page. The signatures are printed names and titles, not handwritten signatures.</p>
 <p>If a certificate is revoked, you get a notification with the reason, and the card shows <span class="ui">Revoked</span>. You can still download the PDF, but the verification page will say the certificate has been revoked.</p>
+
+<h4>Company and signatures (administrators)</h4>
+<ul>
+<li><strong>A location's company.</strong> Open <span class="ui">Administration</span>, then <span class="ui">Departments</span>. In the <span class="ui">Location</span> list, choose T&amp;C Garments or T-CAP in the <span class="ui">Company</span> column. The change is saved as soon as you pick it. This needs <span class="perm">org.manage</span>. It applies only to certificates issued afterwards. Certificates already issued keep their company.</li>
+<li><strong>Company names and signatories.</strong> A Super Admin opens <span class="ui">Administration</span>, then <span class="ui">Settings</span>, and uses the <span class="ui">Certificates</span> card. It holds the <span class="ui">T&amp;C company name</span> and the <span class="ui">T-CAP company name</span>. Under <span class="ui">T&amp;C Garments certificates are signed by</span> and <span class="ui">T-CAP certificates are signed by</span>, each company has up to two signatories, each with a name and a title. The <span class="ui">First signatory</span> is required. Click <span class="ui">Save</span>. The changes appear on every certificate downloaded afterwards, including certificates issued earlier.</li>
+</ul>
 
 <h4>Revoking a certificate (L&amp;D)</h4>
 <ol class="steps">
@@ -736,10 +764,11 @@
 
 <h3>The public verification page</h3>
 <p>Anyone can open <span class="path">/verify/</span> followed by the certificate ID, for example by scanning the QR code. No sign-in is needed, and it does not matter whether the code is typed in capitals or small letters. There is no search box, so the code must be part of the address. The page is titled <span class="ui">Certificate verification</span> and shows one of these messages: <span class="ui">Valid certificate</span>, <span class="ui">This certificate has been revoked</span>, <span class="ui">This certificate has expired</span> or <span class="ui">We could not find a certificate with that code</span>. The app does not set expiry dates, so you will normally see only valid, revoked or not found.</p>
+<p>To protect people's training records, each connection can make up to 20 lookups a minute. After that the page says <span class="ui">Too many verification requests from this connection. Please wait a minute and try again.</span></p>
 <div class="table-wrap"><table class="ref">
 <thead><tr><th>Shown</th><th>Never shown</th></tr></thead>
 <tbody>
-<tr><td><span class="ui">Issued to</span> (full name), <span class="ui">Program</span> (certificate title), <span class="ui">Level</span> (if any), <span class="ui">Completion date</span>, <span class="ui">Learning hours</span>, <span class="ui">Certificate ID</span>, and "Verified by T&amp;C Garments"</td><td>Email, department, job title, employee code, any scores (even the Final score printed on the PDF), skill breakdown and other certificates</td></tr>
+<tr><td><span class="ui">Issued to</span> (the name as printed on the certificate, not shown for a revoked certificate), <span class="ui">Program</span> (certificate title), <span class="ui">Level</span> (if any), <span class="ui">Completion date</span>, <span class="ui">Learning hours</span>, <span class="ui">Certificate ID</span>, and "Verified by T&amp;C Garments"</td><td>Email, department, job title, employee code, any scores (even the Final score printed on the PDF), skill breakdown and other certificates</td></tr>
 </tbody>
 </table></div>
 
@@ -1060,7 +1089,7 @@
 <li>If the course is linked to skills, you can choose the <span class="ui">Skill demonstrated</span>, then a level under <span class="ui">Rate</span> (the default is 3). This is optional. It records an <span class="ui">Observed by manager</span> rating, with your observation as its note.</li>
 <li>Click <span class="ui">Confirm sign-off</span>.</li>
 </ol>
-<p>The employee is notified (<span class="ui">Signed off: {course}</span>), and the course is marked completed straight away. Completion works as it does everywhere else: the employee gets a course-complete notification, a certificate is issued for internal courses and badges are checked.</p>
+<p>The employee is notified (<span class="ui">Signed off: {course}</span>), and the course is marked completed straight away. Completion works as it does everywhere else: the employee gets a course-complete notification, a certificate is issued and badges are checked. Your sign-off counts as evidence, so a course from outside the academy also earns a certificate once you sign it off.</p>
 <p>There are two exceptions:</p>
 <ul>
 <li>If the employee also uploaded proof that an administrator has not yet checked, the course completes only after that check.</li>
@@ -1176,6 +1205,7 @@
 <li><span class="ui">Run recommendation</span> rebuilds the person's suggested learning and notifies them.</li>
 <li>The third button is labelled with the status it will switch to: <span class="ui">Inactive</span> (red) or <span class="ui">Active</span>. It acts straight away, without asking you to confirm. Deactivating also signs the person out at once.</li>
 </ul>
+<p>An existing record also has a <span class="ui">Name on certificates</span> field: the name printed on the person's certificates and shown on the verification page. Before their first download, each learner confirms this name on their <span class="ui">Certificates</span> page. It must contain their name as HR holds it (they may add middle names), in Latin or Arabic letters, and it is then locked. If it needs correcting, type the name here (3 to 80 letters, all Latin or all Arabic) and click <span class="ui">Save</span>. A name you save here counts as confirmed, so the person can download straight away. To ask the person to confirm their name again, clear the field and save. Changing <span class="ui">Full name</span> does not change a name already set here.</p>
 <p>People cannot be deleted. Deactivate leavers instead.</p>
 <div class="callout warn"><strong>Administrator accounts.</strong> Only a Super Admin can grant or remove ADMIN and SUPER ADMIN. For other admins, those boxes are greyed out. Only a Super Admin can save changes to, reset or deactivate anyone holding either role, including a Learning / HR Admin's own record. Anyone else who tries to save or reset gets "You don't have access to this area." For them, the deactivate button does nothing.</div>
 
@@ -1216,7 +1246,7 @@
 <li><span class="ui">Critical role (track succession)</span> lists the job on <span class="ui">Succession</span>.</li>
 </ul>
 Saving a job title recalculates its skill requirements.</li>
-<li><strong><span class="ui">Location</span>:</strong> enter a unique name and, if you like, a <span class="ui">Country</span>. Then click <span class="ui">Add</span>.</li>
+<li><strong><span class="ui">Location</span>:</strong> enter a unique name and, if you like, a <span class="ui">Country</span>. Choose the <span class="ui">Company</span>: T&amp;C Garments (the default) or T-CAP. Then click <span class="ui">Add</span>. The <span class="ui">Company</span> column decides which company issues the certificates of the people at that location. "T-CAP Head Office" is a T-CAP location. To change a location's company, pick the other one in its row. The change is saved straight away and applies to certificates issued afterwards. Certificates already issued keep their company.</li>
 </ul>
 <p>Job families are fixed in code. Career ladders and per-job skill requirements come from configuration, so there is no screen to edit them.</p>
 
@@ -1237,7 +1267,7 @@ Saving a job title recalculates its skill requirements.</li>
 <p>Each day, the scheduler does two things for active rules:</p>
 <ul>
 <li>It enrols every Active person in the group who does not have the course yet, including new joiners.</li>
-<li>It re-enrols anyone whose last completion is older than the repeat period, counted in calendar months. Re-enrolling resets their progress and any supervisor sign-off, but keeps the old certificate.</li>
+<li>It re-enrols anyone whose last completion is older than the repeat period, counted in calendar months. Re-enrolling resets their progress and any supervisor sign-off, but keeps the old certificate. Completing the course again earns a new certificate.</li>
 </ul>
 <p>Rules for unpublished courses are skipped.</p>
 <p>Under <span class="ui">Recurring rules</span>, each rule shows when it last ran (or <span class="ui">Never run</span>), and has a <span class="ui">Pause</span> or <span class="ui">Resume</span> button. Rules cannot be edited or deleted. To change a rule, pause it and create a new one.</p>
@@ -1249,7 +1279,8 @@ Saving a job title recalculates its skill requirements.</li>
 <li>Choose <span class="ui">Verified</span> or <span class="ui">Needs another look</span>. If you like, add <span class="ui">Reviewer feedback</span>.</li>
 <li>Click <span class="ui">Submit</span>.</li>
 </ol>
-<p><span class="ui">Verified</span> marks the course Completed, awards any badges earned and notifies the learner. An academy certificate is issued only for T&amp;C internal courses, so verifying a proof for an external course issues no certificate. A course that needs supervisor sign-off waits at 100% until the sign-off is given. <span class="ui">Needs another look</span> returns the enrolment to In progress and notifies the learner with your feedback.</p>
+<p><span class="ui">Verified</span> marks the course Completed, issues its certificate, awards any badges earned and notifies the learner. A course that needs supervisor sign-off waits at 100% until the sign-off is given. The sign-off then completes it and issues the certificate. <span class="ui">Needs another look</span> returns the enrolment to In progress and notifies the learner with your feedback.</p>
+<p>A proof can be decided only once. If someone else has already decided it, you see "Someone has already reviewed this proof. Reload to see the decision."</p>
 
 <h4>Import training history and overdue learning</h4>
 <p><span class="ui">Import training history</span> is a form for <strong>one record at a time</strong>, not a file import. To add a record:</p>
@@ -1282,22 +1313,24 @@ Saving a job title recalculates its skill requirements.</li>
 <li>Click <span class="ui">Save attendance</span>.</li>
 </ol>
 <p>Ticked people are recorded as Attended and unticked people as Absent. If the session is saved after its start time, it is set to Completed.</p>
-<p>If a course is linked, each person present also gets the credited hours added to their record and a notification. Without a linked course, only attendance is recorded.</p>
-<div class="callout warn"><strong>Limits.</strong> Attendance issues no certificate. Every save adds the credited hours again for everyone ticked, and notifies them again, so check the register before you save. Unticking someone later does not take back their hours or progress. The form's hint says attendance completes the linked course, but in the current version it does not reliably do so. Progress is recalculated from the course's online lessons straight afterwards. A course with no online lessons stays In progress at 100%, and a course with lessons follows the lessons the person has actually done. Check the enrolment status before you rely on attendance for compliance.</div>
+<p>If a course is linked, each person present has that course completed for them and receives its certificate and any badges earned. They also get the credited hours added to their record and a notification. Anyone present who was not yet enrolled in the course is enrolled at this point. Without a linked course, only attendance is recorded.</p>
+<div class="callout warn"><strong>Limits.</strong> Every save adds the credited hours again for everyone ticked, and notifies them again, so check the register before you save. Unticking someone later does not take back their hours, the completion or the certificate. If the linked course also has required online lessons, its progress is still worked out from those lessons, so it can stay In progress until the person has done them. A course that needs supervisor sign-off waits at 100% until the person's manager signs it off. Check the enrolment status before you rely on attendance for compliance.</div>
 
 <h4>To cancel a session</h4>
 <p>Type a <span class="ui">Reason (sent to everyone registered)</span>. If you leave it empty, a standard message is sent. Click <span class="ui">Cancel session</span>, then <span class="ui">Confirm</span>. Everyone with a place or on the waiting list is notified. The session stays on record as Cancelled and cannot be reopened.</p>
 
 <h3>Certificates</h3>
-<p><span class="path">/admin/certificates</span> lists all certificates, 30 per page. You can search by certificate code, title or employee name, and filter by <span class="ui">Status</span> or <span class="ui">Type</span> (Course, Programme, Path). The <span class="ui">Certificate ID</span> link opens the public verification page, and <span class="ui">PDF</span> downloads the certificate.</p>
+<p><span class="path">/admin/certificates</span> lists all certificates, 30 per page. You can search by certificate code, title or employee name, and filter by <span class="ui">Status</span> or <span class="ui">Type</span> (Course, Programme, Path). The <span class="ui">Certificate ID</span> link opens the public verification page, and <span class="ui">PDF</span> downloads the certificate. The verification page shows the holder's name as printed on the certificate. It answers up to 20 lookups a minute from each connection, then asks the visitor to wait a minute.</p>
 <h4>To revoke a certificate</h4>
 <ol class="steps">
 <li>In the <span class="ui">Actions</span> column, click the link labelled <span class="ui">This certificate has been revoked</span>. Despite the label, nothing is revoked yet. The link opens a reason box.</li>
 <li>Type a <span class="ui">Reason</span> of at least 3 characters.</li>
 <li>Click <span class="ui">Confirm</span>.</li>
 </ol>
-<p>The verification page then shows the certificate as revoked, and the holder is notified with your reason. A revocation cannot be undone.</p>
+<p>The verification page then shows the certificate as revoked, without naming the holder, and the holder is notified with your reason. A revocation cannot be undone.</p>
 <p><span class="ui">Export to Excel</span> downloads <strong>all</strong> certificates, whatever filters are set. You cannot issue a certificate by hand here. The platform issues them automatically and does not set expiry dates.</p>
+<p>A certificate is issued for every completed course that has evidence behind it: any T&amp;C internal course, and an outside course once an administrator verifies the learner's proof, once attendance is marked at a classroom session for that course, or once a supervisor signs it off. An outside course that the learner simply marked complete, such as a video, earns no certificate. Courses completed before this rule came in were given their certificates once, automatically.</p>
+<p>The issuing company follows the person: it is the company of their <span class="ui">Location</span>, set on the <span class="ui">Departments</span> page (see above). People with no location receive T&amp;C Garments certificates. A T&amp;C certificate has the T&amp;C mark, a red frame and a round seal. A T-CAP certificate has the T-GROUP logo, charcoal colours and a hexagonal seal. Both have a QR code at the top right that opens the public verification page. Signatures are printed names and titles, not handwritten signatures. By default, both companies' certificates name Ahmed Tolba, Chief Executive Officer, and T&amp;C certificates also name Enis Dancir. A Super Admin changes the company names and each company's signatories in <span class="ui">Settings</span>, on the <span class="ui">Certificates</span> card.</p>
 </section>
 
 <section id="admin-catalogue">
@@ -1319,9 +1352,10 @@ Saving a job title recalculates its skill requirements.</li>
 <div class="table-wrap"><table class="ref">
 <thead><tr><th>Setting (Yes/No unless stated)</th><th>Effect</th></tr></thead>
 <tbody>
+<tr><td><span class="ui">Internal course</span></td><td>Yes for the academy's own courses. Completing one earns a certificate. An outside course (No) earns a certificate only when there is evidence behind the completion: an administrator verifies the proof the learner uploaded, attendance is marked at a classroom session for the course, or a supervisor signs off. Clicking <span class="ui">I have completed this course</span> on its own earns none. An outside course's certificate also names its provider. <span class="ui">Certificate available?</span> under Delivery only records whether the provider gives its own certificate.</td></tr>
 <tr><td><span class="ui">Technical content</span></td><td>Not recommended to non-technical employees, unless they chose the <span class="ui">Programming</span> goal or the course is mandatory.</td></tr>
 <tr><td><span class="ui">Mandatory</span></td><td>Goes into every recommended plan, ignoring the level, technical and language rules and the hours limit. It is still left out if it is not published, its link is failing or withdrawn, the person has completed or is already taking it, or a prerequisite is neither completed nor available.</td></tr>
-<tr><td><span class="ui">Needs supervisor sign-off</span></td><td>Reaching 100% does not complete the course. The employee's direct manager must record an observation on <span class="ui">Practical sign-off</span> (<span class="path">/team/sign-off</span>).</td></tr>
+<tr><td><span class="ui">Needs supervisor sign-off</span></td><td>Reaching 100% does not complete the course. The employee's direct manager must record an observation on <span class="ui">Practical sign-off</span> (<span class="path">/team/sign-off</span>). The sign-off completes the course and issues its certificate, outside courses included.</td></tr>
 <tr><td><span class="ui">Featured</span></td><td>Listed first in the <span class="ui">Course Catalog</span>, with a <span class="ui">Recommended For You</span> badge.</td></tr>
 <tr><td><span class="ui">Curated quality score (0–1)</span></td><td>Used by the engine. Once enough learners have taken the course, a daily job blends in their completion and feedback, starting from your value.</td></tr>
 <tr><td><span class="ui">Review interval (days)</span></td><td>30–1095, default 180. Once it has passed, the course shows <span class="ui">Needs review</span> and is due for the link check.</td></tr>
@@ -1577,6 +1611,12 @@ Saving a job title recalculates its skill requirements.</li>
 <li><span class="ui">Company AI Readiness Index</span>: five weights, each 0–100, labelled Assessment, Training, Improvement, Responsible AI and Application.</li>
 <li><span class="ui">Catalog &amp; security</span>: <span class="ui">Session length (hours)</span> (1–168, default 12, applies from the next sign-in), <span class="ui">Failed logins before lockout</span> (3–20, default 5) and <span class="ui">Lockout duration (minutes)</span> (1–1440, default 15). The lockout applies to password sign-in. <span class="ui">Course review interval (days)</span> (30–1095) and <span class="ui">Default language</span> are also here, but neither is used (see Known limitations).</li>
 </ul>
+<p>The <span class="ui">Certificates</span> card has its own <span class="ui">Save</span> button. It sets who issues and signs certificates:</p>
+<ul>
+<li><span class="ui">T&amp;C company name</span> and <span class="ui">T-CAP company name</span> (both required; by default "T&amp;C Garments" and "T-CAP").</li>
+<li>Under <span class="ui">T&amp;C Garments certificates are signed by</span> and under <span class="ui">T-CAP certificates are signed by</span>: <span class="ui">First signatory</span> (required), <span class="ui">First signatory's title</span>, <span class="ui">Second signatory</span> and <span class="ui">Second signatory's title</span>. Leave the second signatory empty to print only one. By default T&amp;C certificates are signed by Ahmed Tolba, Chief Executive Officer, and Enis Dancir, and T-CAP certificates by Ahmed Tolba, Chief Executive Officer.</li>
+</ul>
+<p>Signatures are printed as names and titles. There are no handwritten signatures. A certificate is drawn when it is downloaded, so a change here appears on every certificate downloaded afterwards, including ones issued earlier. Which company issues a person's certificates depends on the company of their location. You set it in <span class="ui">Departments</span> (<span class="path">/admin/org</span>), in the <span class="ui">Company</span> column of the <span class="ui">Location</span> table, and it applies to certificates issued afterwards. Each save is recorded in the audit log (<code>CERTIFICATE_SETTINGS_CHANGE</code>).</p>
 <p>The <span class="ui">AI provider</span> and <span class="ui">SMTP email</span> cards each have their own <span class="ui">Save</span> button. <span class="ui">AI provider</span> has <span class="ui">Enable AI features</span>, <span class="ui">Provider</span> (Anthropic, OpenAI, OpenRouter or <span class="ui">OpenAI-compatible</span>), <span class="ui">Model</span>, <span class="ui">Base URL</span> and <span class="ui">Max tokens</span> (128–8192). API keys are never entered here. They are set on the server (<code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>OPENROUTER_API_KEY</code> or <code>AI_API_KEY</code>). <span class="ui">SMTP email</span> has <span class="ui">Enable email delivery</span>, <span class="ui">Host</span>, <span class="ui">Port</span>, <span class="ui">User</span> and <span class="ui">From address</span>. The password comes from <code>SMTP_PASSWORD</code>. Until email is enabled, password-reset links are written to the server log instead of being emailed.</p>
 <p><span class="ui">Reminders</span> lists the reminder rules. Each shows its trigger, number of days and channel, plus a checkbox labelled <span class="ui">Active</span> (or <span class="ui">Inactive</span> when it is off). Ticking or clearing the checkbox saves straight away. <span class="ui">Run now</span> sends any reminders from active rules that are due. A duplicate of an unread reminder is never created. The count shown afterwards also includes the duplicates that were skipped, so it can be higher than the number actually delivered.</p>
 <p><span class="ui">Scheduled jobs</span> shows when each job last ran. The scheduler checks every 15 minutes:</p>
@@ -1722,6 +1762,7 @@ curl -H "Authorization: Bearer tca_YOUR_KEY" \
 <ul>
 <li>Each reply is <code>{"data": [...], "nextCursor": "..."}</code>. Call again with <code>cursor</code> set to the <code>nextCursor</code> value until it is <code>null</code>. <code>limit</code> defaults to 100 (maximum 500).</li>
 <li>Certificates include revoked ones, so check <code>status</code>. A <code>since</code> value that cannot be read as a date is ignored, and you get everything.</li>
+<li>When every completed course with evidence started earning a certificate, courses completed before that were given their certificates once, automatically. Those certificates are dated the day the course was completed, and no <code>certificate.issued</code> webhook was sent for them, so a <code>since</code> value based on your last sync misses them. Read the certificates endpoint once without <code>since</code> to catch up.</li>
 <li>The limit is 120 requests per minute per key. Above that, the API answers <code>429</code> with <code>Retry-After: 60</code>. A missing or revoked key gets <code>401</code>.</li>
 </ul>
 
@@ -1815,7 +1856,7 @@ npx tsx scripts/run-jobs.mts --only backup</code></pre>
 
 <h3>Load testing</h3>
 <pre><code>npm run load-test -- --url http://localhost:3000 --users 25 --seconds 30</code></pre>
-<p>It requests public pages only (default <code>/api/health</code>, <code>/login</code> and a certificate check; change with <code>--paths</code>) and reports p50/p95/p99 latency, status codes and errors. Test a production build (<code>npm run build</code>, then <code>npm run start</code>), not the dev server.</p>
+<p>It requests public pages only (default <code>/api/health</code>, <code>/login</code> and a certificate check; change with <code>--paths</code>) and reports p50/p95/p99 latency, status codes and errors. Test a production build (<code>npm run build</code>, then <code>npm run start</code>), not the dev server. The certificate check allows 20 lookups per minute from one connection. After that it shows <span class="ui">Too many verification requests from this connection. Please wait a minute and try again.</span>, so its timings mostly measure that short page.</p>
 <div class="callout warn"><strong>Not against production unannounced.</strong> The test is designed to reach the server's limit. Agree a time window before pointing it at the live site.</div>
 
 <h3>Security controls</h3>
@@ -1825,7 +1866,7 @@ npx tsx scripts/run-jobs.mts --only backup</code></pre>
 <tr><td>Session cookie</td><td><code>__Host-tcai_session</code>: HttpOnly, Secure, SameSite=Lax. It holds a random token that is stored only as a hash. Its length is set in <span class="ui">Session length (hours)</span> (default 12). A deactivated account is signed out on its next request.</td></tr>
 <tr><td>Lockout</td><td>Set with <span class="ui">Failed logins before lockout</span> (default 5) and <span class="ui">Lockout duration (minutes)</span> (default 15). Every attempt is logged with its IP address and browser, and shown under <span class="ui">Recent sign-ins</span> on the person's page in <span class="ui">People</span> and on their own <span class="ui">Profile</span>.</td></tr>
 <tr><td>Passwords</td><td>Stored with bcrypt (cost 12). A new password needs at least 10 characters with letters and digits. Reset links last one hour.</td></tr>
-<tr><td>Rate limits</td><td>API: 120 per minute per key. Registration: 5 per 15 minutes per employee code. Per person: AI coach 20 per minute, course search 120 per minute, exports 10 per minute, executive report 5 per minute. Limits are kept in memory and reset on restart.</td></tr>
+<tr><td>Rate limits</td><td>API: 120 per minute per key. Registration: 5 per 15 minutes per employee code. Public certificate verification page: 20 lookups per minute per connection (IP address). Per person: AI coach 20 per minute, course search 120 per minute, exports 10 per minute, executive report 5 per minute. Limits are kept in memory and reset on restart.</td></tr>
 <tr><td>Security headers</td><td><code>X-Frame-Options: SAMEORIGIN</code>, <code>frame-ancestors 'self'</code>, <code>nosniff</code>, <code>strict-origin-when-cross-origin</code>, a restrictive <code>Permissions-Policy</code>, and HSTS for one year. SCORM files are served with their own Content-Security-Policy instead.</td></tr>
 <tr><td>Audit log</td><td><span class="path">/admin/audit</span> (Super Admin, <span class="perm">audit.view</span>), with <span class="ui">Export to Excel</span>. It records sign-ins, admin changes, HR sync, API keys, webhooks and jobs. Password, token and secret fields are redacted.</td></tr>
 <tr><td>Role escalation guard</td><td>Only a Super Admin (<span class="perm">roles.manage</span>) can grant or remove Admin or Super Admin, or edit, reset or deactivate an administrator.</td></tr>

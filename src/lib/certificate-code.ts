@@ -30,16 +30,23 @@ export async function nextCertificateCode(prisma: PrismaClient, year = new Date(
  * sign-offs are ours. An outside course counts only with something a person
  * vouched for — a verified proof, attendance taken at a classroom session, or
  * a supervisor's sign-off. Ticking "Mark complete" on an imported video is not.
+ *
+ * Only evidence from this enrolment counts: recurring training re-enrols from
+ * `enrolledAt`, and last cycle's proof or attendance must not earn this one's
+ * certificate. (A renewal drops the old sign-off itself.)
  */
 export async function hasCertificateEvidence(
   prisma: PrismaClient,
-  e: { id: string; userId: string; courseId: string; course: { isInternal: boolean } },
+  e: { id: string; userId: string; courseId: string; enrolledAt: Date; course: { isInternal: boolean } },
 ) {
   if (e.course.isInternal) return true;
+  const since = { gte: e.enrolledAt };
   const [proof, signOff, attended] = await Promise.all([
-    prisma.externalCompletionProof.count({ where: { enrollmentId: e.id, status: "VERIFIED" } }),
+    prisma.externalCompletionProof.count({ where: { enrollmentId: e.id, status: "VERIFIED", uploadedAt: since } }),
     prisma.practicalSignOff.count({ where: { enrollmentId: e.id } }),
-    prisma.sessionRegistration.count({ where: { userId: e.userId, status: "ATTENDED", session: { courseId: e.courseId } } }),
+    prisma.sessionRegistration.count({
+      where: { userId: e.userId, status: "ATTENDED", attendanceAt: since, session: { courseId: e.courseId } },
+    }),
   ]);
   return proof + signOff + attended > 0;
 }

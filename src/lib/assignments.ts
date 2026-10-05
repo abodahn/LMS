@@ -126,7 +126,9 @@ export async function assignCourse(input: {
       // the next click, and last year's supervisor sign-off satisfies this
       // year's practical — so the renewal would be recorded as done, and as
       // observed, without anybody doing or watching anything. The certificate
-      // and the audit log keep the previous completion.
+      // and the audit log keep the previous completion. The new enrolment date
+      // starts the cycle, so last cycle's proof or attendance earns no new
+      // certificate either.
       await prisma.$transaction([
         prisma.lessonProgress.deleteMany({ where: { enrollmentId: existing.id } }),
         prisma.scormState.deleteMany({ where: { enrollmentId: existing.id } }),
@@ -136,6 +138,7 @@ export async function assignCourse(input: {
           data: {
             status: "NOT_STARTED",
             progressPercent: 0,
+            enrolledAt: now,
             startedAt: null,
             completedAt: null,
             selfReportedDone: false,

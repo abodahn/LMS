@@ -21,6 +21,7 @@ export async function backfillCourseCertificates(prisma: Db) {
       id: true,
       userId: true,
       courseId: true,
+      enrolledAt: true,
       completedAt: true,
       course: { select: { title: true, estimatedHours: true, isInternal: true } },
       user: { select: { location: { select: { company: true } } } },

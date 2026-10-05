@@ -4,6 +4,7 @@ import { issueCourseCertificate } from "./certificates";
 import { awardBadges } from "./badges";
 import { notify } from "./notifications";
 import { recalcEnrollmentProgress } from "./learner";
+import { canComplete } from "./completion-rule";
 import { creditHours } from "./session-hours";
 
 export { creditHours };
@@ -164,13 +165,23 @@ export type AttendanceMark = { userId: string; attended: boolean };
  *
  * Attendance is the only evidence an in-person session produces, so it is what
  * completes the enrolment: if the session delivers a course, everyone marked
- * present has that course completed for them. Nobody is enrolled behind their
- * back — a seat in the session is the consent.
+ * present has that course completed for them — unless a supervisor must still
+ * sign the practical off, or the course has online lessons of its own to do.
+ * Nobody is enrolled behind their back — a seat in the session is the consent.
  */
 export async function markAttendance(sessionId: string, marks: AttendanceMark[], markedById: string) {
   const session = await prisma.trainingSession.findUniqueOrThrow({ where: { id: sessionId } });
   const now = new Date();
   let completed = 0;
+  const course = session.courseId
+    ? await prisma.course.findUnique({
+        where: { id: session.courseId },
+        select: { requiresSignOff: true, modules: { select: { lessons: { where: { isRequired: true }, select: { id: true } } } } },
+      })
+    : null;
+  // A course with required online lessons is still completed by those lessons;
+  // attendance completes only an in-person course, which has none to tick off.
+  const inPerson = !!course && course.modules.every((m) => m.lessons.length === 0);
 
   for (const mark of marks) {
     await prisma.sessionRegistration.updateMany({
@@ -182,28 +193,37 @@ export async function markAttendance(sessionId: string, marks: AttendanceMark[],
       },
     });
 
-    if (!mark.attended || !session.courseId) continue;
+    if (!mark.attended || !session.courseId || !course) continue;
 
     const enrollment = await prisma.enrollment.upsert({
       where: { userId_courseId: { userId: mark.userId, courseId: session.courseId } },
       update: {},
-      create: { userId: mark.userId, courseId: session.courseId, source: "ASSIGNED" },
+      // Dated with the attendance, so it counts as this enrolment's evidence.
+      create: { userId: mark.userId, courseId: session.courseId, source: "ASSIGNED", enrolledAt: now },
     });
 
-    // An in-person course has no lessons to tick off, so completion is set
-    // directly; recalc leaves a lesson-less course's percentage alone.
+    // Completion is set directly (recalc leaves a lesson-less course alone),
+    // but a practical that must be watched waits at 100% for the sign-off.
+    const open = inPerson && enrollment.status !== "COMPLETED";
+    const finishes =
+      open &&
+      canComplete({
+        requiresSignOff: course.requiresSignOff,
+        progressPercent: 100,
+        hasSignOff: (await prisma.practicalSignOff.count({ where: { enrollmentId: enrollment.id } })) > 0,
+      }).ok;
     await prisma.enrollment.update({
       where: { id: enrollment.id },
       data: {
-        status: "COMPLETED",
-        progressPercent: 100,
-        completedAt: enrollment.completedAt ?? now,
+        ...(open && { progressPercent: 100, startedAt: enrollment.startedAt ?? now }),
+        ...(open && !finishes && enrollment.status === "NOT_STARTED" && { status: "IN_PROGRESS" }),
+        ...(finishes && { status: "COMPLETED", completedAt: now }),
         lastAccessedAt: now,
         timeSpentMinutes: enrollment.timeSpentMinutes + Math.round(creditHours(session) * 60),
       },
     });
     await recalcEnrollmentProgress(enrollment.id);
-    if (enrollment.status !== "COMPLETED") {
+    if (finishes) {
       await courseCompleted(enrollment.id);
       // Attendance completes the course like any other route, so it earns the
       // same certificate and badges.
