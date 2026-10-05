@@ -20,3 +20,31 @@ export function hashPassword(plain: string) {
 export function verifyPassword(plain: string, hash: string) {
   return bcrypt.compare(plain, hash);
 }
+
+/**
+ * Stored instead of a hash while nobody holds a password for the account. It
+ * matches no password, and it is what lets the person activate the account
+ * themselves on the registration page.
+ */
+export const UNCLAIMED_PASSWORD = "!unclaimed";
+
+const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+
+/**
+ * A temporary password for one person, who must change it at first sign-in:
+ * 14 random characters with no look-alikes (I, l, 1, O, 0), then a digit so it
+ * meets the password rule.
+ */
+export function temporaryPassword() {
+  const bytes = crypto.getRandomValues(new Uint8Array(14));
+  return `${Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join("")}9`;
+}
+
+/**
+ * Hashes a generated temporary password. bcrypt's cost is there to slow the
+ * guessing of passwords people choose; against some 80 random bits it adds
+ * nothing, so a lower one keeps an import of thousands to seconds.
+ */
+export function hashTemporaryPassword(plain: string) {
+  return bcrypt.hash(plain, 8);
+}

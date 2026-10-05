@@ -2,7 +2,7 @@
 // from scripts, and validating a roster file offline needs the same.
 import { z } from "zod";
 import { prisma } from "../db";
-import { hashPassword } from "../password";
+import { hashTemporaryPassword, temporaryPassword } from "../password";
 import type { ParsedRow } from "./parse";
 import { LOCALES } from "../constants";
 
@@ -190,29 +190,43 @@ export async function validateEmployeeRows(headers: string[], rows: ParsedRow[])
   };
 }
 
-/** Commits only the rows the preview marked as importable. */
+export type TemporaryCredential = { employeeCode: string; fullName: string; email: string; password: string };
+
 /**
+ * Commits only the rows the preview marked as importable.
+ *
+ * Each new person gets a temporary password of their own, returned here once
+ * for the administrator to hand out and never stored in plain text. One
+ * password for everyone would let any of them sign in as a colleague who has
+ * not yet, since employee ids are easy to guess.
+ *
  * `canTouchPrivileged`: whether the importer may update people who hold an
  * Admin or Super Admin role. Without it those rows are skipped — a sheet must
  * not be a way to change an administrator's email and then reset into it.
  */
-export async function commitEmployeeImport(preview: ImportPreview, defaultPassword: string, canTouchPrivileged = false) {
+export async function commitEmployeeImport(preview: ImportPreview, canTouchPrivileged = false) {
   const importable = preview.rows.filter((r) => (r.status === "NEW" || r.status === "EXISTING") && r.data);
-  const passwordHash = await hashPassword(defaultPassword);
   const employeeRole = await prisma.role.findUnique({ where: { key: "EMPLOYEE" } });
+
+  // Matched as the preview matched them, ignoring case: an exact lookup here
+  // would quietly leave empty a link the preview said was fine.
+  const [departments, jobTitles, locations] = await Promise.all([
+    prisma.department.findMany(),
+    prisma.jobTitle.findMany(),
+    prisma.location.findMany(),
+  ]);
+  const same = (a: string, b?: string) => !!b && a.toLowerCase() === b.toLowerCase();
 
   let created = 0;
   let updated = 0;
+  let conflicts = 0;
+  const credentials: TemporaryCredential[] = [];
 
   for (const row of importable) {
     const d = row.data!;
-    const department = d.department
-      ? await prisma.department.findFirst({
-          where: { OR: [{ name: d.department }, { code: d.department }] },
-        })
-      : null;
-    const jobTitle = d.jobTitle ? await prisma.jobTitle.findFirst({ where: { name: d.jobTitle } }) : null;
-    const location = d.location ? await prisma.location.findFirst({ where: { name: d.location } }) : null;
+    const department = departments.find((x) => same(x.name, d.department) || same(x.code, d.department)) ?? null;
+    const jobTitle = jobTitles.find((x) => same(x.name, d.jobTitle)) ?? null;
+    const location = locations.find((x) => same(x.name, d.location)) ?? null;
     const section =
       department && d.section
         ? await prisma.section.findFirst({ where: { departmentId: department.id, name: d.section } })
@@ -237,11 +251,27 @@ export async function commitEmployeeImport(preview: ImportPreview, defaultPasswo
       continue;
     }
 
-    const user = existing
-      ? await prisma.user.update({ where: { id: existing.id }, data: base })
-      : await prisma.user.create({
-          data: { employeeCode: d.employeeCode, passwordHash, mustChangePassword: true, ...base },
-        });
+    const password = existing ? null : temporaryPassword();
+    let user;
+    try {
+      user = existing
+        ? await prisma.user.update({ where: { id: existing.id }, data: base })
+        : await prisma.user.create({
+            data: {
+              employeeCode: d.employeeCode,
+              passwordHash: await hashTemporaryPassword(password!),
+              mustChangePassword: true,
+              ...base,
+            },
+          });
+    } catch (e) {
+      // The email already belongs to someone else. Skipped rather than failing
+      // the rest of the file — the rows before it are already saved.
+      if ((e as { code?: string }).code !== "P2002") throw e;
+      conflicts++;
+      continue;
+    }
+    if (password) credentials.push({ employeeCode: d.employeeCode, fullName: d.fullName, email: d.email, password });
 
     if (existing) updated++;
     else {
@@ -283,7 +313,7 @@ export async function commitEmployeeImport(preview: ImportPreview, defaultPasswo
     }
   }
 
-  return { created, updated, skipped: preview.rows.length - importable.length };
+  return { created, updated, skipped: preview.rows.length - importable.length + conflicts, credentials };
 }
 
 function normaliseExperience(value?: string) {

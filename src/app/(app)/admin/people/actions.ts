@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { hashPassword, requirePermission } from "@/lib/auth";
+import { UNCLAIMED_PASSWORD, temporaryPassword } from "@/lib/password";
 import { cleanCertificateName } from "@/lib/certificate-settings";
 import { audit } from "@/lib/audit";
 import { ROLE_KEYS, LOCALES } from "@/lib/constants";
-import { commitEmployeeImport, previewEmployeeImport, validateEmployeeRows, type ImportPreview } from "@/lib/import/employees";
+import { commitEmployeeImport, previewEmployeeImport, validateEmployeeRows, type ImportPreview, type TemporaryCredential } from "@/lib/import/employees";
 import { generateRecommendations } from "@/lib/recommendation/service";
 import { notify } from "@/lib/notifications";
 
@@ -17,6 +18,7 @@ export type ImportState = {
   success?: string;
   params?: Record<string, number>;
   preview?: ImportPreview;
+  credentials?: TemporaryCredential[];
 };
 
 const userSchema = z.object({
@@ -101,7 +103,9 @@ export async function saveUserAction(_prev: PeopleState, formData: FormData): Pr
   const user = d.userId
     ? await prisma.user.update({ where: { id: d.userId }, data: { ...data, ...certificateFields } })
     : await prisma.user.create({
-        data: { ...data, passwordHash: await hashPassword(randomPassword()), mustChangePassword: true },
+        // Nobody holds a password yet: the person activates the account on the
+        // registration page, or an administrator resets it to hand one over.
+        data: { ...data, passwordHash: UNCLAIMED_PASSWORD, mustChangePassword: true },
       });
 
   const roleRows = await prisma.role.findMany({ where: { key: { in: roles.length ? roles : ["EMPLOYEE"] } } });
@@ -146,7 +150,7 @@ export async function setUserStatusAction(userId: string, status: "ACTIVE" | "IN
 export async function resetUserPasswordAction(userId: string): Promise<PeopleState> {
   const admin = await requirePermission("users.manage");
   if (await touchesPrivileged(admin, userId)) return { error: "errors.forbidden" };
-  const password = randomPassword();
+  const password = temporaryPassword();
   await prisma.user.update({
     where: { id: userId },
     data: { passwordHash: await hashPassword(password), mustChangePassword: true, failedLoginCount: 0, lockedUntil: null },
@@ -203,9 +207,6 @@ export async function previewImportAction(_prev: ImportState, formData: FormData
 export async function commitImportAction(_prev: ImportState, formData: FormData): Promise<ImportState> {
   const admin = await requirePermission("users.import");
   const payload = String(formData.get("payload") ?? "");
-  const defaultPassword = String(formData.get("defaultPassword") ?? "").trim();
-
-  if (defaultPassword.length < 10) return { error: "auth.passwordTooWeak" };
 
   let parsed: { headers: string[]; rows: Record<string, string>[] };
   try {
@@ -216,7 +217,7 @@ export async function commitImportAction(_prev: ImportState, formData: FormData)
 
   // Re-validate server-side: the browser's verdict is never trusted.
   const preview = await validateEmployeeRows(parsed.headers, parsed.rows);
-  const result = await commitEmployeeImport(preview, defaultPassword, admin.permissions.includes("roles.manage"));
+  const result = await commitEmployeeImport(preview, admin.permissions.includes("roles.manage"));
 
   await audit({
     actorId: admin.id,
@@ -230,11 +231,7 @@ export async function commitImportAction(_prev: ImportState, formData: FormData)
   return {
     success: "form.employeesImported",
     params: { created: result.created, updated: result.updated, skipped: result.skipped },
+    // Shown once to the administrator; never stored in plain text or logged.
+    credentials: result.credentials,
   };
-}
-
-function randomPassword() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-  const bytes = crypto.getRandomValues(new Uint8Array(14));
-  return `${Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("")}9`;
 }

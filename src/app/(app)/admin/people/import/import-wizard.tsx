@@ -2,11 +2,12 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { AlertCircle, CheckCircle2, Copy, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, Copy, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, StatCard, TableShell } from "@/components/ui/primitives";
-import { Field, FormError, FormSuccess, TextInput } from "@/components/ui/form";
+import { Field, FormError, FormSuccess } from "@/components/ui/form";
 import { useMessage, useT } from "@/components/i18n-provider";
+import type { TemporaryCredential } from "@/lib/import/employees";
 import { commitImportAction, previewImportAction, type ImportState } from "../actions";
 
 function PreviewSubmit() {
@@ -27,6 +28,57 @@ function CommitSubmit({ count }: { count: number }) {
     <Button type="submit" disabled={pending || count === 0}>
       {pending ? t("common.saving") : `${t("common.confirm")} — ${count}`}
     </Button>
+  );
+}
+
+/** The new people's temporary passwords, shown once, with a download for handing them out. */
+function TemporaryPasswords({ list }: { list: TemporaryCredential[] }) {
+  const t = useT();
+  const download = () => {
+    // Excel reads a cell starting = + - @ as a formula; a leading quote keeps it text.
+    const cell = (v: string) => `"${(/^[=+\-@]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`;
+    const rows = [
+      [t("profile.employeeId"), t("profile.fullName"), t("profile.email"), t("form.temporaryPassword")],
+      ...list.map((c) => [c.employeeCode, c.fullName, c.email, c.password]),
+    ];
+    // The byte-order mark makes Excel open Arabic and Turkish names as UTF-8.
+    const csv = `\uFEFF${rows.map((r) => r.map(cell).join(",")).join("\r\n")}`;
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "temporary-passwords.csv";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return (
+    <Card className="space-y-3 p-5">
+      <h2 className="text-[15px] font-semibold text-[var(--brand-ink)]">{t("form.temporaryPasswordsTitle")}</h2>
+      <p className="text-[13px] text-[var(--brand-muted)]">{t("form.temporaryPasswordsIntro")}</p>
+      <Button type="button" onClick={download}>
+        <Download size={16} />
+        {t("form.downloadTemporaryPasswords")}
+      </Button>
+      <TableShell>
+        <thead>
+          <tr>
+            <th>{t("profile.employeeId")}</th>
+            <th>{t("profile.fullName")}</th>
+            <th>{t("form.temporaryPassword")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {list.map((c) => (
+            <tr key={c.employeeCode}>
+              <td className="font-mono text-[12px]">{c.employeeCode}</td>
+              <td>{c.fullName}</td>
+              <td className="font-mono text-[12px]" dir="ltr">
+                {c.password}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </TableShell>
+    </Card>
   );
 }
 
@@ -142,13 +194,7 @@ export function ImportWizard() {
               <FormError>{msg(commitState.error)}</FormError>
               <FormSuccess>{msg(commitState.success, commitState.params)}</FormSuccess>
 
-              <Field
-                label={t("form.tempPassword")}
-                hint={t("form.tempPasswordHint")}
-                required
-              >
-                {(p) => <TextInput {...p} name="defaultPassword" minLength={10} required defaultValue="" />}
-              </Field>
+              <p className="text-[12px] text-[var(--brand-muted)]">{t("form.temporaryPasswordsHint")}</p>
 
               <p className="inline-flex items-start gap-1.5 text-[12px] text-[var(--brand-muted)]">
                 <Copy size={13} className="mt-0.5 shrink-0" aria-hidden />
@@ -158,6 +204,8 @@ export function ImportWizard() {
               <CommitSubmit count={importable.length} />
             </form>
           </Card>
+
+          {commitState.credentials?.length ? <TemporaryPasswords list={commitState.credentials} /> : null}
         </>
       ) : null}
     </div>

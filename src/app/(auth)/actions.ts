@@ -21,6 +21,7 @@ import { SETTING_KEYS } from "@/lib/constants";
 import { LOCALE_COOKIE } from "@/lib/locale";
 import { isLocale } from "@/lib/i18n";
 import { sendMail } from "@/lib/mailer";
+import { UNCLAIMED_PASSWORD } from "@/lib/password";
 import { rateLimit } from "@/lib/rate-limit";
 import { oidcConfig } from "@/lib/oidc";
 
@@ -175,11 +176,22 @@ export async function changePasswordAction(_prev: ActionState, formData: FormDat
 
   const row = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
   if (!(await verifyPassword(current, row.passwordHash))) return { error: "auth.invalidCredentials" };
+  // Whoever handed out a temporary password knows it, so keeping it would leave
+  // the forced change undone.
+  if (await verifyPassword(password, row.passwordHash)) return { error: "auth.passwordUnchanged" };
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { passwordHash: await hashPassword(password), mustChangePassword: false },
-  });
+  // Every other session ends: one opened with the old password, perhaps by
+  // someone else, must not carry on once the owner has changed it. This
+  // browser gets a fresh one.
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: await hashPassword(password), mustChangePassword: false },
+    }),
+    prisma.session.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } }),
+  ]);
+  const sessionHours = Number((await getSettings())[SETTING_KEYS.SESSION_HOURS] ?? 12);
+  await createSession(user.id, sessionHours);
   await audit({ actorId: user.id, actorName: user.fullName, action: "PASSWORD_CHANGE", entity: "User", entityId: user.id });
   redirect("/");
 }
@@ -250,14 +262,17 @@ export async function registerAction(_prev: ActionState, formData: FormData): Pr
     where: { employeeCode, deletedAt: null },
   });
 
-  // An account can be claimed once: never signed in, and still carrying the
-  // placeholder credentials the import gave it. Never one that was switched
-  // off — a leaver is not reinstated by knowing their own email address.
+  // An account can be claimed once, and only while nobody holds a password for
+  // it: added without one, and never signed in. Once HR has handed its owner a
+  // temporary password — from an import or a reset — the owner signs in with
+  // that, and a colleague who knows the employee id and email must not get
+  // there first. Never one that was switched off — a leaver is not reinstated
+  // by knowing their own email address.
   const claimable =
     !!user &&
     user.status !== "INACTIVE" &&
     user.lastLoginAt === null &&
-    (user.mustChangePassword || user.status === "INVITED") &&
+    user.passwordHash === UNCLAIMED_PASSWORD &&
     user.email.toLowerCase() === email;
 
   if (!claimable) {
