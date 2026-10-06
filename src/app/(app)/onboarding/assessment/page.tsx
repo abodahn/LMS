@@ -31,7 +31,7 @@ export default async function OnboardingAssessmentPage() {
           {t("onboarding.readyTitle")}
         </h1>
         <p className="mt-2 text-[15px] leading-relaxed text-[var(--brand-muted)]">
-          {t("onboarding.readySubtitle")}
+          {t("onboarding.readySubtitle", { count: definition.questionCount })}
         </p>
       </header>
 

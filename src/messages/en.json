@@ -1192,7 +1192,7 @@
     "goalsSubtitle": "Pick as many as you like. You can change this later.",
     "saveAndContinue": "Save and continue",
     "readyTitle": "Your assessment is ready",
-    "readySubtitle": "25 practical questions about using AI at work. Your answers save automatically.",
+    "readySubtitle": "{count} practical questions about using AI at work. Your answers save automatically.",
     "startAssessment": "Start Assessment"
   },
   "passport": {

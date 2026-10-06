@@ -1192,7 +1192,7 @@
     "goalsSubtitle": "İstediğiniz kadar seçin. Daha sonra değiştirebilirsiniz.",
     "saveAndContinue": "Kaydet ve devam et",
     "readyTitle": "Değerlendirmeniz hazır",
-    "readySubtitle": "İş yerinde yapay zekâ kullanımına dair 25 pratik soru. Cevaplarınız otomatik kaydedilir.",
+    "readySubtitle": "İş yerinde yapay zekâ kullanımına dair {count} pratik soru. Cevaplarınız otomatik kaydedilir.",
     "startAssessment": "Değerlendirmeye başla"
   },
   "passport": {
